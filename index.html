@@ -8,687 +8,303 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Corp Actions">
   <meta name="description" content="Track corporate actions, dividends, splits, and calculate investment returns">
-  
   <title>Corporate Actions Tracker</title>
-  
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="icon" type="image/png" href="icons/icon-192.png">
-  
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; width: 100%; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0f1a;
-      color: #e6edf3;
-      -webkit-font-smoothing: antialiased;
-      -webkit-tap-highlight-color: transparent;
-    }
-    
-    /* Loading screen */
-    .loading-screen {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-    }
-    .loading-logo {
-      width: 80px;
-      height: 80px;
-      background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%);
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 36px;
-      font-weight: bold;
-      color: white;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.05); opacity: 0.8; }
-    }
-    .loading-text {
-      color: #8b949e;
-      font-size: 14px;
-    }
-    
-    /* Utility classes */
-    .container { max-width: 100%; padding: 0 16px; }
-    @media (min-width: 768px) { .container { max-width: 1400px; margin: 0 auto; padding: 0 40px; } }
-    
-    /* Pull to refresh indicator */
-    .ptr-indicator {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%) translateY(-100%);
-      background: rgba(31, 111, 235, 0.9);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 0 0 12px 12px;
-      font-size: 12px;
-      transition: transform 0.3s ease;
-      z-index: 1000;
-    }
-    .ptr-indicator.visible { transform: translateX(-50%) translateY(0); }
-    
-    /* Install prompt */
-    .install-prompt {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);
-      border-radius: 16px;
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      z-index: 1000;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-      animation: slideUp 0.3s ease;
-    }
-    @keyframes slideUp {
-      from { transform: translateY(100px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    .install-prompt-text { flex: 1; }
-    .install-prompt-title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
-    .install-prompt-desc { font-size: 12px; opacity: 0.9; }
-    .install-prompt button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .install-btn { background: white; color: #1f6feb; }
-    .dismiss-btn { background: rgba(255,255,255,0.2); color: white; }
-    
-    /* Offline indicator */
-    .offline-banner {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: #f85149;
-      color: white;
-      text-align: center;
-      padding: 8px;
-      font-size: 12px;
-      z-index: 2000;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%); color: #e6edf3; -webkit-font-smoothing: antialiased; }
+    .loading-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+    .loading-screen.hidden { display: none; }
+    .loading-logo { width: 80px; height: 80px; background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; color: white; margin-bottom: 24px; animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); opacity: 0.8; } }
+    .loading-text { color: #8b949e; font-size: 14px; }
   </style>
 </head>
 <body>
-  <div id="root">
-    <div class="loading-screen" id="loading">
-      <div class="loading-logo">CA</div>
-      <div class="loading-text">Loading...</div>
-    </div>
-  </div>
-  
-  <div class="ptr-indicator" id="ptr">Pull to refresh</div>
-  
+  <div id="root"></div>
+  <div class="loading-screen" id="loading"><div class="loading-logo">CA</div><div class="loading-text">Loading...</div></div>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
   <script>
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-          .then(reg => console.log('SW registered'))
-          .catch(err => console.log('SW registration failed:', err));
-      });
-    }
-    
-    // Install prompt handling
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      
-      // Check if already dismissed
-      if (localStorage.getItem('installDismissed')) return;
-      
-      // Show install prompt after 3 seconds
-      setTimeout(() => {
-        showInstallPrompt();
-      }, 3000);
-    });
-    
-    function showInstallPrompt() {
-      const prompt = document.createElement('div');
-      prompt.className = 'install-prompt';
-      prompt.innerHTML = `
-        <div class="install-prompt-text">
-          <div class="install-prompt-title">Install Corporate Actions</div>
-          <div class="install-prompt-desc">Add to home screen for quick access</div>
-        </div>
-        <button class="dismiss-btn" onclick="dismissInstall(this.parentElement)">Later</button>
-        <button class="install-btn" onclick="installApp(this.parentElement)">Install</button>
-      `;
-      document.body.appendChild(prompt);
-    }
-    
-    function installApp(promptEl) {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(choice => {
-          deferredPrompt = null;
-          promptEl.remove();
-        });
-      }
-    }
-    
-    function dismissInstall(promptEl) {
-      localStorage.setItem('installDismissed', 'true');
-      promptEl.remove();
-    }
-    
-    // Offline detection
-    function updateOnlineStatus() {
-      const existing = document.querySelector('.offline-banner');
-      if (!navigator.onLine) {
-        if (!existing) {
-          const banner = document.createElement('div');
-          banner.className = 'offline-banner';
-          banner.textContent = 'You are offline. Some features may be unavailable.';
-          document.body.prepend(banner);
-        }
-      } else if (existing) {
-        existing.remove();
-      }
-    }
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    updateOnlineStatus();
-  </script>
-  
-  <script type="text/babel" data-type="module">
-    const { useState, useEffect, useCallback, useMemo } = React;
+    if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('sw.js').catch(function(e) { console.log('SW failed:', e); }); }); }
+    var e = React.createElement, useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo;
+    function formatCurrency(v) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v); }
+    function formatPercent(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+    function formatDate(d) { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
 
-    function App() {
-      const [ticker, setTicker] = useState('');
-      const [searchedTicker, setSearchedTicker] = useState('');
-      const [investmentAmount, setInvestmentAmount] = useState(10000);
-      const [investmentDate, setInvestmentDate] = useState('2020-01-01');
-      const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-      const [loading, setLoading] = useState(false);
-      const [error, setError] = useState(null);
-      const [apiKey, setApiKey] = useState(() => localStorage.getItem('polygonApiKey') || '');
-      const [showApiInput, setShowApiInput] = useState(true);
-      const [dividends, setDividends] = useState([]);
-      const [splits, setSplits] = useState([]);
-      const [priceData, setPriceData] = useState(null);
-      const [tickerDetails, setTickerDetails] = useState(null);
-      const [returnCalculation, setReturnCalculation] = useState(null);
-      const [activeTab, setActiveTab] = useState('summary');
-      const [currentPrice, setCurrentPrice] = useState(null);
-      const [recentSearches, setRecentSearches] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('recentSearches') || '[]'); }
-        catch { return []; }
-      });
-
-      // Save API key to localStorage
-      useEffect(() => {
-        if (apiKey) localStorage.setItem('polygonApiKey', apiKey);
-      }, [apiKey]);
-
-      // Save recent searches
-      const addRecentSearch = (t) => {
-        const updated = [t, ...recentSearches.filter(s => s !== t)].slice(0, 5);
-        setRecentSearches(updated);
-        localStorage.setItem('recentSearches', JSON.stringify(updated));
-      };
-
-      const fetchData = useCallback(async () => {
-        if (!ticker || !apiKey) return;
-        setLoading(true);
-        setError(null);
-        setSearchedTicker(ticker.toUpperCase());
-        addRecentSearch(ticker.toUpperCase());
-        
-        try {
-          const [divRes, splitRes, detailsRes, priceRes, prevRes] = await Promise.all([
-            fetch(`https://api.polygon.io/v3/reference/dividends?ticker=${ticker.toUpperCase()}&limit=1000&apiKey=${apiKey}`),
-            fetch(`https://api.polygon.io/v3/reference/splits?ticker=${ticker.toUpperCase()}&limit=1000&apiKey=${apiKey}`),
-            fetch(`https://api.polygon.io/v3/reference/tickers/${ticker.toUpperCase()}?apiKey=${apiKey}`),
-            fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker.toUpperCase()}/range/1/day/${investmentDate}/${endDate}?adjusted=true&sort=asc&limit=50000&apiKey=${apiKey}`),
-            fetch(`https://api.polygon.io/v2/aggs/ticker/${ticker.toUpperCase()}/prev?adjusted=true&apiKey=${apiKey}`)
-          ]);
-          
-          const [divData, splitData, detailsData, priceDataRes, prevData] = await Promise.all([
-            divRes.json(), splitRes.json(), detailsRes.json(), priceRes.json(), prevRes.json()
-          ]);
-          
-          if (divData.status === 'OK') setDividends(divData.results || []);
-          if (splitData.status === 'OK') setSplits(splitData.results || []);
-          if (detailsData.status === 'OK') setTickerDetails(detailsData.results);
-          if (prevData.status === 'OK' && prevData.results?.[0]) setCurrentPrice(prevData.results[0].c);
-          
-          if (priceDataRes.status === 'OK' && priceDataRes.results?.length > 0) {
-            setPriceData(priceDataRes.results);
-            calculateReturns(priceDataRes.results, divData.results || [], splitData.results || []);
-          }
-          setShowApiInput(false);
-        } catch (err) {
-          setError(err.message || 'Failed to fetch data');
-        } finally {
-          setLoading(false);
-          document.getElementById('loading').style.display = 'none';
-        }
-      }, [ticker, apiKey, investmentDate, endDate]);
-
-      const calculateReturns = (prices, divs, splts) => {
-        if (!prices || prices.length < 2) return;
-        const startPrice = prices[0].c;
-        const endPrice = prices[prices.length - 1].c;
-        const startDate = new Date(prices[0].t);
-        const endDateObj = new Date(prices[prices.length - 1].t);
-        const sharesPurchased = investmentAmount / startPrice;
-        
-        let adjustedShares = sharesPurchased;
-        const relevantSplits = splts.filter(s => {
-          const splitDate = new Date(s.execution_date);
-          return splitDate >= startDate && splitDate <= endDateObj;
-        });
-        relevantSplits.forEach(split => {
-          adjustedShares = adjustedShares * (split.split_to / split.split_from);
-        });
-        
-        const relevantDividends = divs.filter(d => {
-          const payDate = new Date(d.pay_date);
-          return payDate >= startDate && payDate <= endDateObj;
-        });
-        const totalDividendIncome = relevantDividends.reduce((sum, div) => sum + (div.cash_amount * adjustedShares), 0);
-        
-        const endingShareValue = adjustedShares * endPrice;
-        const totalReturn = endingShareValue + totalDividendIncome;
-        const percentReturn = ((totalReturn - investmentAmount) / investmentAmount) * 100;
-        const years = (endDateObj - startDate) / (365.25 * 24 * 60 * 60 * 1000);
-        const annualizedReturn = years > 0 ? (Math.pow(totalReturn / investmentAmount, 1/years) - 1) * 100 : 0;
-        
-        setReturnCalculation({
-          startPrice, endPrice, sharesPurchased, adjustedShares, totalDividendIncome,
-          endingShareValue, totalReturn, percentReturn, annualizedReturn, years,
-          priceReturn: ((endPrice - startPrice) / startPrice) * 100,
-          dividendCount: relevantDividends.length,
-          splitCount: relevantSplits.length
-        });
-      };
-
-      useEffect(() => {
-        if (priceData && dividends && splits) calculateReturns(priceData, dividends, splits);
-      }, [investmentAmount, priceData, dividends, splits]);
-
-      // Hide loading screen once mounted
-      useEffect(() => {
-        document.getElementById('loading').style.display = 'none';
-      }, []);
-
-      const dividendAnalysis = useMemo(() => {
-        if (!dividends.length || !currentPrice) return null;
-        const now = new Date();
-        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        
-        const ttmDividends = dividends.filter(d => {
-          const exDate = new Date(d.ex_dividend_date);
-          return exDate >= oneYearAgo && exDate <= now;
-        });
-        const ttmDividendTotal = ttmDividends.reduce((sum, d) => sum + d.cash_amount, 0);
-        const currentYield = currentPrice > 0 ? (ttmDividendTotal / currentPrice) * 100 : 0;
-        
-        const dividendsByYear = {};
-        dividends.forEach(d => {
-          const year = new Date(d.ex_dividend_date).getFullYear();
-          dividendsByYear[year] = (dividendsByYear[year] || 0) + d.cash_amount;
-        });
-        const years = Object.keys(dividendsByYear).sort();
-        const yearlyData = years.map(year => ({ year: parseInt(year), total: dividendsByYear[year] }));
-        
-        const calculateCAGR = (yearsBack) => {
-          if (yearlyData.length < yearsBack + 1) return null;
-          const recentYears = yearlyData.slice(-yearsBack - 1);
-          if (recentYears.length < 2) return null;
-          const startValue = recentYears[0].total;
-          const endValue = recentYears[recentYears.length - 1].total;
-          if (startValue <= 0 || endValue <= 0) return null;
-          return (Math.pow(endValue / startValue, 1 / yearsBack) - 1) * 100;
-        };
-        
-        const yoyGrowth = yearlyData.length >= 2 
-          ? ((yearlyData[yearlyData.length - 1].total / yearlyData[yearlyData.length - 2].total) - 1) * 100 : null;
-        
-        const frequencyMap = {};
-        dividends.forEach(d => { frequencyMap[d.frequency || 0] = (frequencyMap[d.frequency || 0] || 0) + 1; });
-        const mostCommonFreq = Object.entries(frequencyMap).sort((a, b) => b[1] - a[1])[0]?.[0];
-        const frequencyLabels = { 0: 'One-time', 1: 'Annual', 2: 'Semi-Annual', 4: 'Quarterly', 12: 'Monthly' };
-        
-        const sortedYears = years.map(y => parseInt(y)).sort((a, b) => b - a);
-        let consecutiveYears = 0;
-        const currentYear = new Date().getFullYear();
-        for (let i = 0; i < sortedYears.length; i++) {
-          if (sortedYears[i] === currentYear - i || sortedYears[i] === currentYear - i - 1) consecutiveYears++;
-          else break;
-        }
-        
-        return {
-          currentYield, ttmDividendTotal, yearlyData,
-          cagr1Year: yoyGrowth, cagr3Year: calculateCAGR(3), cagr5Year: calculateCAGR(5),
-          frequency: frequencyLabels[mostCommonFreq] || 'Variable', consecutiveYears,
-          latestDividend: dividends[0]?.cash_amount || 0
-        };
-      }, [dividends, currentPrice]);
-
-      const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
-      const formatPercent = (val) => `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`;
-      const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-
-      const stats = useMemo(() => {
-        const now = new Date();
-        return {
-          totalDividends: dividends.length,
-          totalSplits: splits.length,
-          upcomingDividends: dividends.filter(d => new Date(d.ex_dividend_date) > now),
-          upcomingSplits: splits.filter(s => new Date(s.execution_date) > now),
-          latestDividend: dividends[0],
-          latestSplit: splits[0]
-        };
-      }, [dividends, splits]);
-
-      const DividendChart = ({ data }) => {
-        if (!data?.length) return null;
-        const maxValue = Math.max(...data.map(d => d.total));
-        const recentData = data.slice(-8);
-        return (
-          <div style={{ marginTop: '16px' }}>
-            <div style={{ fontSize: '12px', color: '#8b949e', marginBottom: '12px' }}>Annual Dividend History</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' }}>
-              {recentData.map((item, i) => {
-                const height = maxValue > 0 ? (item.total / maxValue) * 100 : 0;
-                const isGrowing = i > 0 && item.total > recentData[i - 1].total;
-                const isDecreasing = i > 0 && item.total < recentData[i - 1].total;
-                return (
-                  <div key={item.year} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: '100%', height: `${height}%`, minHeight: '4px',
-                      background: isDecreasing ? '#f85149' : isGrowing ? '#3fb950' : '#58a6ff',
-                      borderRadius: '3px 3px 0 0' }} />
-                    <div style={{ fontSize: '9px', color: '#8b949e', marginTop: '4px' }}>'{item.year.toString().slice(-2)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      };
-
-      const styles = {
-        container: { minHeight: '100vh', background: 'linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%)', paddingBottom: '80px' },
-        header: { background: 'rgba(13, 17, 23, 0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(48, 54, 61, 0.6)', padding: '16px', position: 'sticky', top: 0, zIndex: 100 },
-        card: { background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(48, 54, 61, 0.8)', borderRadius: '12px', padding: '16px' },
-        input: { width: '100%', padding: '14px 16px', background: 'rgba(13, 17, 23, 0.6)', border: '1px solid rgba(48, 54, 61, 0.8)', borderRadius: '10px', color: '#e6edf3', fontSize: '16px', outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none' },
-        button: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: 600, cursor: 'pointer' },
-        label: { display: 'block', marginBottom: '8px', fontSize: '13px', color: '#8b949e', fontWeight: 500 },
-        metric: { fontSize: '11px', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }
-      };
-
-      return (
-        <div style={styles.container}>
-          {/* Header */}
-          <header style={styles.header}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold' }}>CA</div>
-                <div>
-                  <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Corp Actions</h1>
-                  {searchedTicker && <p style={{ margin: 0, fontSize: '12px', color: '#58a6ff' }}>{searchedTicker}</p>}
-                </div>
-              </div>
-              {!showApiInput && (
-                <button onClick={() => setShowApiInput(true)} style={{ padding: '8px 12px', background: 'rgba(48, 54, 61, 0.5)', border: '1px solid rgba(48, 54, 61, 0.8)', borderRadius: '8px', color: '#8b949e', fontSize: '12px' }}>
-                  Settings
-                </button>
-              )}
-            </div>
-          </header>
-
-          <main style={{ padding: '16px' }}>
-            {/* Setup Screen */}
-            {showApiInput && (
-              <div style={{ ...styles.card, marginBottom: '16px' }}>
-                <h2 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 600 }}>Get Started</h2>
-                <p style={{ margin: '0 0 20px 0', color: '#8b949e', fontSize: '14px' }}>
-                  Enter your Polygon.io API key and a stock ticker.
-                </p>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={styles.label}>API Key</label>
-                    <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Your Polygon.io API key" style={styles.input} />
-                    <a href="https://polygon.io" target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: '#58a6ff', display: 'block', marginTop: '6px' }}>Get free API key →</a>
-                  </div>
-                  
-                  <div>
-                    <label style={styles.label}>Stock Ticker</label>
-                    <input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} placeholder="e.g. AAPL, MSFT, JNJ" style={styles.input} />
-                    {recentSearches.length > 0 && (
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        {recentSearches.map(t => (
-                          <button key={t} onClick={() => setTicker(t)} style={{ padding: '6px 12px', background: 'rgba(88, 166, 255, 0.1)', border: '1px solid rgba(88, 166, 255, 0.3)', borderRadius: '6px', color: '#58a6ff', fontSize: '12px' }}>{t}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={styles.label}>Start Date</label>
-                      <input type="date" value={investmentDate} onChange={e => setInvestmentDate(e.target.value)} style={styles.input} />
-                    </div>
-                    <div>
-                      <label style={styles.label}>End Date</label>
-                      <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={styles.input} />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label style={styles.label}>Investment Amount ($)</label>
-                    <input type="number" value={investmentAmount} onChange={e => setInvestmentAmount(parseFloat(e.target.value) || 0)} style={styles.input} />
-                  </div>
-                  
-                  <button onClick={fetchData} disabled={loading || !ticker || !apiKey} style={{ ...styles.button, opacity: (loading || !ticker || !apiKey) ? 0.6 : 1 }}>
-                    {loading ? 'Loading...' : 'Analyse'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {error && <div style={{ background: 'rgba(248, 81, 73, 0.1)', border: '1px solid rgba(248, 81, 73, 0.4)', borderRadius: '12px', padding: '14px', marginBottom: '16px', color: '#f85149', fontSize: '14px' }}>{error}</div>}
-
-            {/* Results */}
-            {searchedTicker && !loading && !showApiInput && (
-              <>
-                {/* Company Info */}
-                {tickerDetails && (
-                  <div style={{ ...styles.card, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '20px', fontWeight: 700 }}>{searchedTicker}</div>
-                      <div style={{ fontSize: '13px', color: '#8b949e' }}>{tickerDetails.name}</div>
-                    </div>
-                    {currentPrice && (
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '24px', fontWeight: 700 }}>{formatCurrency(currentPrice)}</div>
-                        {dividendAnalysis && <div style={{ fontSize: '12px', color: '#3fb950' }}>{dividendAnalysis.currentYield.toFixed(2)}% yield</div>}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Key Metrics */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  {returnCalculation && (
-                    <div style={{ ...styles.card, background: 'linear-gradient(135deg, rgba(46, 160, 67, 0.15) 0%, rgba(35, 134, 54, 0.1) 100%)', border: '1px solid rgba(46, 160, 67, 0.3)' }}>
-                      <div style={styles.metric}>Total Return</div>
-                      <div style={{ fontSize: '24px', fontWeight: 700, color: returnCalculation.percentReturn >= 0 ? '#3fb950' : '#f85149' }}>{formatPercent(returnCalculation.percentReturn)}</div>
-                      <div style={{ fontSize: '11px', color: '#8b949e' }}>{returnCalculation.annualizedReturn.toFixed(1)}% p.a.</div>
-                    </div>
-                  )}
-                  {dividendAnalysis && (
-                    <div style={styles.card}>
-                      <div style={styles.metric}>5Y Div Growth</div>
-                      <div style={{ fontSize: '24px', fontWeight: 700, color: dividendAnalysis.cagr5Year >= 0 ? '#3fb950' : '#f85149' }}>
-                        {dividendAnalysis.cagr5Year !== null ? formatPercent(dividendAnalysis.cagr5Year) : 'N/A'}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#8b949e' }}>{dividendAnalysis.consecutiveYears}yr streak</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Investment Summary */}
-                {returnCalculation && (
-                  <div style={{ ...styles.card, marginBottom: '12px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Investment Summary</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
-                      <div><span style={{ color: '#8b949e' }}>Invested:</span> <strong>{formatCurrency(investmentAmount)}</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Final Value:</span> <strong style={{ color: '#58a6ff' }}>{formatCurrency(returnCalculation.totalReturn)}</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Dividends:</span> <strong style={{ color: '#3fb950' }}>{formatCurrency(returnCalculation.totalDividendIncome)}</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Period:</span> <strong>{returnCalculation.years.toFixed(1)} years</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Shares:</span> <strong>{returnCalculation.sharesPurchased.toFixed(2)} → {returnCalculation.adjustedShares.toFixed(2)}</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Price:</span> <strong>{formatCurrency(returnCalculation.startPrice)} → {formatCurrency(returnCalculation.endPrice)}</strong></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Dividend Analysis */}
-                {dividendAnalysis?.yearlyData?.length > 0 && (
-                  <div style={{ ...styles.card, marginBottom: '12px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>Dividend Analysis</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                      <div><span style={{ color: '#8b949e' }}>Frequency</span><br/><strong>{dividendAnalysis.frequency}</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Latest</span><br/><strong style={{ color: '#3fb950' }}>{formatCurrency(dividendAnalysis.latestDividend)}</strong></div>
-                      <div><span style={{ color: '#8b949e' }}>Annual</span><br/><strong>{formatCurrency(dividendAnalysis.ttmDividendTotal)}</strong></div>
-                    </div>
-                    <DividendChart data={dividendAnalysis.yearlyData} />
-                  </div>
-                )}
-
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
-                  {['dividends', 'splits', 'upcoming'].map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '10px 16px', background: activeTab === tab ? 'rgba(31, 111, 235, 0.2)' : 'rgba(48, 54, 61, 0.3)', border: activeTab === tab ? '1px solid rgba(31, 111, 235, 0.5)' : '1px solid transparent', borderRadius: '8px', color: activeTab === tab ? '#58a6ff' : '#8b949e', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)} ({tab === 'dividends' ? dividends.length : tab === 'splits' ? splits.length : stats.upcomingDividends.length + stats.upcomingSplits.length})
-                    </button>
-                  ))}
-                </div>
-
-                {/* Dividend List */}
-                {activeTab === 'dividends' && (
-                  <div style={{ ...styles.card, padding: '0', overflow: 'hidden' }}>
-                    {dividends.length === 0 ? (
-                      <div style={{ padding: '32px', textAlign: 'center', color: '#8b949e' }}>No dividend history</div>
-                    ) : (
-                      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        {dividends.slice(0, 50).map((div, i) => (
-                          <div key={div.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: i > 0 ? '1px solid rgba(48, 54, 61, 0.4)' : 'none' }}>
-                            <div>
-                              <div style={{ fontSize: '14px', fontWeight: 500 }}>{formatDate(div.ex_dividend_date)}</div>
-                              <div style={{ fontSize: '11px', color: '#8b949e' }}>Pay: {div.pay_date ? formatDate(div.pay_date) : 'TBD'}</div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '16px', fontWeight: 600, color: '#3fb950' }}>{formatCurrency(div.cash_amount)}</div>
-                              <div style={{ fontSize: '10px', padding: '2px 6px', background: div.dividend_type === 'CD' ? 'rgba(46, 160, 67, 0.15)' : 'rgba(187, 128, 9, 0.15)', color: div.dividend_type === 'CD' ? '#3fb950' : '#d29922', borderRadius: '4px', display: 'inline-block' }}>
-                                {div.dividend_type === 'CD' ? 'Regular' : div.dividend_type === 'SC' ? 'Special' : 'Cash'}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Splits List */}
-                {activeTab === 'splits' && (
-                  <div style={{ ...styles.card, padding: '0', overflow: 'hidden' }}>
-                    {splits.length === 0 ? (
-                      <div style={{ padding: '32px', textAlign: 'center', color: '#8b949e' }}>No stock splits</div>
-                    ) : (
-                      <div>
-                        {splits.map((split, i) => {
-                          const isReverse = split.split_from > split.split_to;
-                          return (
-                            <div key={split.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48, 54, 61, 0.4)' : 'none' }}>
-                              <div>
-                                <div style={{ fontSize: '14px', fontWeight: 500 }}>{formatDate(split.execution_date)}</div>
-                                <div style={{ fontSize: '12px', color: isReverse ? '#f85149' : '#3fb950' }}>{isReverse ? 'Reverse Split' : 'Forward Split'}</div>
-                              </div>
-                              <div style={{ fontSize: '20px', fontWeight: 700, color: '#58a6ff', fontFamily: 'monospace' }}>{split.split_to}:{split.split_from}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Upcoming Events */}
-                {activeTab === 'upcoming' && (
-                  <div style={{ ...styles.card, padding: '0', overflow: 'hidden' }}>
-                    {stats.upcomingDividends.length === 0 && stats.upcomingSplits.length === 0 ? (
-                      <div style={{ padding: '32px', textAlign: 'center', color: '#8b949e' }}>No upcoming events</div>
-                    ) : (
-                      <div>
-                        {stats.upcomingDividends.map((div, i) => (
-                          <div key={`div-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48, 54, 61, 0.4)' : 'none' }}>
-                            <div style={{ width: '40px', height: '40px', background: 'rgba(46, 160, 67, 0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>💰</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600 }}>Dividend: {formatCurrency(div.cash_amount)}</div>
-                              <div style={{ fontSize: '12px', color: '#8b949e' }}>Ex-div: {formatDate(div.ex_dividend_date)}</div>
-                            </div>
-                          </div>
-                        ))}
-                        {stats.upcomingSplits.map((split, i) => (
-                          <div key={`split-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: '1px solid rgba(48, 54, 61, 0.4)' }}>
-                            <div style={{ width: '40px', height: '40px', background: 'rgba(31, 111, 235, 0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>✂️</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600 }}>Split: {split.split_to}:{split.split_from}</div>
-                              <div style={{ fontSize: '12px', color: '#8b949e' }}>{formatDate(split.execution_date)}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Quick Search */}
-                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(13, 17, 23, 0.95)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(48, 54, 61, 0.6)', padding: '12px 16px', display: 'flex', gap: '8px' }}>
-                  <input type="text" value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} placeholder="Ticker" style={{ ...styles.input, flex: 1, padding: '12px' }} />
-                  <button onClick={fetchData} disabled={loading || !ticker} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 600, opacity: (loading || !ticker) ? 0.6 : 1 }}>
-                    {loading ? '...' : 'Go'}
-                  </button>
-                </div>
-              </>
-            )}
-          </main>
-        </div>
+    function DividendChart(props) {
+      var data = props.data;
+      if (!data || !data.length) return null;
+      var maxVal = Math.max.apply(null, data.map(function(d) { return d.total; }));
+      var recent = data.slice(-8);
+      return e('div', { style: { marginTop: '16px' } },
+        e('div', { style: { fontSize: '12px', color: '#8b949e', marginBottom: '12px' } }, 'Annual Dividend History'),
+        e('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' } },
+          recent.map(function(item, i) {
+            var h = maxVal > 0 ? (item.total / maxVal) * 100 : 0;
+            var grow = i > 0 && item.total > recent[i-1].total;
+            var dec = i > 0 && item.total < recent[i-1].total;
+            return e('div', { key: item.year, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+              e('div', { style: { width: '100%', height: h + '%', minHeight: '4px', background: dec ? '#f85149' : grow ? '#3fb950' : '#58a6ff', borderRadius: '3px 3px 0 0' } }),
+              e('div', { style: { fontSize: '9px', color: '#8b949e', marginTop: '4px' } }, "'" + String(item.year).slice(-2))
+            );
+          })
+        )
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    function App() {
+      var _ticker = useState(''), ticker = _ticker[0], setTicker = _ticker[1];
+      var _searched = useState(''), searchedTicker = _searched[0], setSearchedTicker = _searched[1];
+      var _amount = useState(10000), investmentAmount = _amount[0], setInvestmentAmount = _amount[1];
+      var _startDate = useState('2020-01-01'), investmentDate = _startDate[0], setInvestmentDate = _startDate[1];
+      var _endDate = useState(new Date().toISOString().split('T')[0]), endDate = _endDate[0], setEndDate = _endDate[1];
+      var _loading = useState(false), loading = _loading[0], setLoading = _loading[1];
+      var _error = useState(null), error = _error[0], setError = _error[1];
+      var _apiKey = useState(localStorage.getItem('polygonApiKey') || ''), apiKey = _apiKey[0], setApiKey = _apiKey[1];
+      var _showSetup = useState(true), showSetup = _showSetup[0], setShowSetup = _showSetup[1];
+      var _dividends = useState([]), dividends = _dividends[0], setDividends = _dividends[1];
+      var _splits = useState([]), splits = _splits[0], setSplits = _splits[1];
+      var _priceData = useState(null), priceData = _priceData[0], setPriceData = _priceData[1];
+      var _details = useState(null), tickerDetails = _details[0], setTickerDetails = _details[1];
+      var _returns = useState(null), returnCalc = _returns[0], setReturnCalc = _returns[1];
+      var _tab = useState('dividends'), activeTab = _tab[0], setActiveTab = _tab[1];
+      var _price = useState(null), currentPrice = _price[0], setCurrentPrice = _price[1];
+      var _recent = useState(function() { try { return JSON.parse(localStorage.getItem('recentSearches') || '[]'); } catch(e) { return []; } }), recentSearches = _recent[0], setRecentSearches = _recent[1];
+
+      useEffect(function() { if (apiKey) localStorage.setItem('polygonApiKey', apiKey); }, [apiKey]);
+      useEffect(function() { document.getElementById('loading').classList.add('hidden'); }, []);
+
+      function addRecent(t) {
+        var updated = [t].concat(recentSearches.filter(function(s) { return s !== t; })).slice(0, 5);
+        setRecentSearches(updated);
+        localStorage.setItem('recentSearches', JSON.stringify(updated));
+      }
+
+      function calcReturns(prices, divs, splts) {
+        if (!prices || prices.length < 2) return;
+        var startP = prices[0].c, endP = prices[prices.length - 1].c;
+        var startD = new Date(prices[0].t), endD = new Date(prices[prices.length - 1].t);
+        var shares = investmentAmount / startP, adjShares = shares;
+        splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; })
+          .forEach(function(s) { adjShares = adjShares * (s.split_to / s.split_from); });
+        var relDivs = divs.filter(function(d) { var pd = new Date(d.pay_date); return pd >= startD && pd <= endD; });
+        var divIncome = 0; relDivs.forEach(function(d) { divIncome += d.cash_amount * adjShares; });
+        var endVal = adjShares * endP, total = endVal + divIncome;
+        var pctRet = ((total - investmentAmount) / investmentAmount) * 100;
+        var yrs = (endD - startD) / (365.25 * 24 * 60 * 60 * 1000);
+        var annRet = yrs > 0 ? (Math.pow(total / investmentAmount, 1/yrs) - 1) * 100 : 0;
+        setReturnCalc({ startPrice: startP, endPrice: endP, sharesPurchased: shares, adjustedShares: adjShares,
+          totalDividendIncome: divIncome, endingShareValue: endVal, totalReturn: total, percentReturn: pctRet,
+          annualizedReturn: annRet, years: yrs, priceReturn: ((endP - startP) / startP) * 100,
+          dividendCount: relDivs.length, splitCount: splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; }).length });
+      }
+
+      function fetchData() {
+        if (!ticker || !apiKey) return;
+        setLoading(true); setError(null);
+        var t = ticker.toUpperCase();
+        setSearchedTicker(t); addRecent(t);
+        Promise.all([
+          fetch('https://api.polygon.io/v3/reference/dividends?ticker=' + t + '&limit=1000&apiKey=' + apiKey),
+          fetch('https://api.polygon.io/v3/reference/splits?ticker=' + t + '&limit=1000&apiKey=' + apiKey),
+          fetch('https://api.polygon.io/v3/reference/tickers/' + t + '?apiKey=' + apiKey),
+          fetch('https://api.polygon.io/v2/aggs/ticker/' + t + '/range/1/day/' + investmentDate + '/' + endDate + '?adjusted=true&sort=asc&limit=50000&apiKey=' + apiKey),
+          fetch('https://api.polygon.io/v2/aggs/ticker/' + t + '/prev?adjusted=true&apiKey=' + apiKey)
+        ]).then(function(res) { return Promise.all(res.map(function(r) { return r.json(); })); })
+        .then(function(data) {
+          var divD = data[0], splitD = data[1], detD = data[2], priceD = data[3], prevD = data[4];
+          if (divD.status === 'OK') setDividends(divD.results || []);
+          if (splitD.status === 'OK') setSplits(splitD.results || []);
+          if (detD.status === 'OK') setTickerDetails(detD.results);
+          if (prevD.status === 'OK' && prevD.results && prevD.results[0]) setCurrentPrice(prevD.results[0].c);
+          if (priceD.status === 'OK' && priceD.results && priceD.results.length > 0) {
+            setPriceData(priceD.results);
+            calcReturns(priceD.results, divD.results || [], splitD.results || []);
+          }
+          setShowSetup(false); setLoading(false);
+        }).catch(function(err) { setError(err.message || 'Failed to fetch'); setLoading(false); });
+      }
+
+      useEffect(function() { if (priceData && dividends && splits) calcReturns(priceData, dividends, splits); }, [investmentAmount]);
+
+      var divAnalysis = useMemo(function() {
+        if (!dividends.length || !currentPrice) return null;
+        var now = new Date(), oneYrAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        var ttm = dividends.filter(function(d) { var ex = new Date(d.ex_dividend_date); return ex >= oneYrAgo && ex <= now; });
+        var ttmTotal = 0; ttm.forEach(function(d) { ttmTotal += d.cash_amount; });
+        var yld = currentPrice > 0 ? (ttmTotal / currentPrice) * 100 : 0;
+        var byYear = {}; dividends.forEach(function(d) { var y = new Date(d.ex_dividend_date).getFullYear(); byYear[y] = (byYear[y] || 0) + d.cash_amount; });
+        var yrs = Object.keys(byYear).sort();
+        var yearly = yrs.map(function(y) { return { year: parseInt(y), total: byYear[y] }; });
+        function cagr(n) { if (yearly.length < n + 1) return null; var r = yearly.slice(-n - 1); if (r.length < 2 || r[0].total <= 0 || r[r.length-1].total <= 0) return null; return (Math.pow(r[r.length-1].total / r[0].total, 1/n) - 1) * 100; }
+        var yoy = yearly.length >= 2 ? ((yearly[yearly.length-1].total / yearly[yearly.length-2].total) - 1) * 100 : null;
+        var freqMap = {}; dividends.forEach(function(d) { var f = d.frequency || 0; freqMap[f] = (freqMap[f] || 0) + 1; });
+        var freqLabels = { '0': 'One-time', '1': 'Annual', '2': 'Semi-Annual', '4': 'Quarterly', '12': 'Monthly' };
+        var topFreq = Object.entries(freqMap).sort(function(a, b) { return b[1] - a[1]; })[0];
+        var consec = 0, curYr = now.getFullYear(), sortedYrs = yrs.map(function(y) { return parseInt(y); }).sort(function(a,b) { return b - a; });
+        for (var i = 0; i < sortedYrs.length; i++) { if (sortedYrs[i] === curYr - i || sortedYrs[i] === curYr - i - 1) consec++; else break; }
+        return { currentYield: yld, ttmDividendTotal: ttmTotal, yearlyData: yearly, cagr1Year: yoy, cagr3Year: cagr(3), cagr5Year: cagr(5),
+          frequency: freqLabels[topFreq ? topFreq[0] : '0'] || 'Variable', consecutiveYears: consec, latestDividend: dividends[0] ? dividends[0].cash_amount : 0 };
+      }, [dividends, currentPrice]);
+
+      var stats = useMemo(function() {
+        var now = new Date();
+        return { totalDividends: dividends.length, totalSplits: splits.length,
+          upcomingDividends: dividends.filter(function(d) { return new Date(d.ex_dividend_date) > now; }),
+          upcomingSplits: splits.filter(function(s) { return new Date(s.execution_date) > now; }) };
+      }, [dividends, splits]);
+
+      var s = {
+        container: { minHeight: '100vh', background: 'linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%)', paddingBottom: '80px' },
+        header: { background: 'rgba(13,17,23,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(48,54,61,0.6)', padding: '16px', position: 'sticky', top: 0, zIndex: 100 },
+        card: { background: 'rgba(13,17,23,0.6)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '12px', padding: '16px', marginBottom: '12px' },
+        input: { width: '100%', padding: '14px 16px', background: 'rgba(13,17,23,0.6)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '10px', color: '#e6edf3', fontSize: '16px', outline: 'none', boxSizing: 'border-box' },
+        btn: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: '600', cursor: 'pointer' },
+        label: { display: 'block', marginBottom: '8px', fontSize: '13px', color: '#8b949e', fontWeight: '500' },
+        metric: { fontSize: '11px', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }
+      };
+
+      if (showSetup) {
+        return e('div', { style: s.container },
+          e('header', { style: s.header },
+            e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+              e('div', { style: { width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', color: 'white' } }, 'CA'),
+              e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, 'Corp Actions')
+            )
+          ),
+          e('main', { style: { padding: '16px' } },
+            e('div', { style: s.card },
+              e('h2', { style: { margin: '0 0 8px', fontSize: '18px', fontWeight: '600' } }, 'Get Started'),
+              e('p', { style: { margin: '0 0 20px', color: '#8b949e', fontSize: '14px' } }, 'Enter your Polygon.io API key and a stock ticker.'),
+              e('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
+                e('div', null,
+                  e('label', { style: s.label }, 'API Key'),
+                  e('input', { type: 'password', value: apiKey, onChange: function(ev) { setApiKey(ev.target.value); }, placeholder: 'Your Polygon.io API key', style: s.input }),
+                  e('a', { href: 'https://polygon.io', target: '_blank', style: { fontSize: '12px', color: '#58a6ff', display: 'block', marginTop: '6px' } }, 'Get free API key →')
+                ),
+                e('div', null,
+                  e('label', { style: s.label }, 'Stock Ticker'),
+                  e('input', { type: 'text', value: ticker, onChange: function(ev) { setTicker(ev.target.value.toUpperCase()); }, placeholder: 'e.g. AAPL, MSFT', style: s.input }),
+                  recentSearches.length > 0 && e('div', { style: { display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' } },
+                    recentSearches.map(function(t) { return e('button', { key: t, onClick: function() { setTicker(t); }, style: { padding: '6px 12px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)', borderRadius: '6px', color: '#58a6ff', fontSize: '12px', cursor: 'pointer' } }, t); })
+                  )
+                ),
+                e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } },
+                  e('div', null, e('label', { style: s.label }, 'Start Date'), e('input', { type: 'date', value: investmentDate, onChange: function(ev) { setInvestmentDate(ev.target.value); }, style: s.input })),
+                  e('div', null, e('label', { style: s.label }, 'End Date'), e('input', { type: 'date', value: endDate, onChange: function(ev) { setEndDate(ev.target.value); }, style: s.input }))
+                ),
+                e('div', null, e('label', { style: s.label }, 'Investment Amount ($)'), e('input', { type: 'number', value: investmentAmount, onChange: function(ev) { setInvestmentAmount(parseFloat(ev.target.value) || 0); }, style: s.input })),
+                e('button', { onClick: fetchData, disabled: loading || !ticker || !apiKey, style: Object.assign({}, s.btn, { opacity: (loading || !ticker || !apiKey) ? 0.6 : 1 }) }, loading ? 'Loading...' : 'Analyse')
+              )
+            ),
+            error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', color: '#f85149', fontSize: '14px' } }, error)
+          )
+        );
+      }
+
+      return e('div', { style: s.container },
+        e('header', { style: s.header },
+          e('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+            e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+              e('div', { style: { width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', color: 'white' } }, 'CA'),
+              e('div', null, e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, 'Corp Actions'), searchedTicker && e('p', { style: { margin: 0, fontSize: '12px', color: '#58a6ff' } }, searchedTicker))
+            ),
+            e('button', { onClick: function() { setShowSetup(true); }, style: { padding: '8px 12px', background: 'rgba(48,54,61,0.5)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '8px', color: '#8b949e', fontSize: '12px', cursor: 'pointer' } }, 'Settings')
+          )
+        ),
+        e('main', { style: { padding: '16px' } },
+          error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', marginBottom: '12px', color: '#f85149', fontSize: '14px' } }, error),
+          tickerDetails && e('div', { style: Object.assign({}, s.card, { display: 'flex', alignItems: 'center', gap: '12px' }) },
+            e('div', { style: { flex: 1 } }, e('div', { style: { fontSize: '20px', fontWeight: '700' } }, searchedTicker), e('div', { style: { fontSize: '13px', color: '#8b949e' } }, tickerDetails.name)),
+            currentPrice && e('div', { style: { textAlign: 'right' } }, e('div', { style: { fontSize: '24px', fontWeight: '700' } }, formatCurrency(currentPrice)), divAnalysis && e('div', { style: { fontSize: '12px', color: '#3fb950' } }, divAnalysis.currentYield.toFixed(2) + '% yield'))
+          ),
+          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' } },
+            returnCalc && e('div', { style: Object.assign({}, s.card, { marginBottom: 0, background: 'linear-gradient(135deg, rgba(46,160,67,0.15) 0%, rgba(35,134,54,0.1) 100%)', border: '1px solid rgba(46,160,67,0.3)' }) },
+              e('div', { style: s.metric }, 'Total Return'),
+              e('div', { style: { fontSize: '24px', fontWeight: '700', color: returnCalc.percentReturn >= 0 ? '#3fb950' : '#f85149' } }, formatPercent(returnCalc.percentReturn)),
+              e('div', { style: { fontSize: '11px', color: '#8b949e' } }, returnCalc.annualizedReturn.toFixed(1) + '% p.a.')
+            ),
+            divAnalysis && e('div', { style: Object.assign({}, s.card, { marginBottom: 0 }) },
+              e('div', { style: s.metric }, '5Y Div Growth'),
+              e('div', { style: { fontSize: '24px', fontWeight: '700', color: divAnalysis.cagr5Year !== null && divAnalysis.cagr5Year >= 0 ? '#3fb950' : '#f85149' } }, divAnalysis.cagr5Year !== null ? formatPercent(divAnalysis.cagr5Year) : 'N/A'),
+              e('div', { style: { fontSize: '11px', color: '#8b949e' } }, divAnalysis.consecutiveYears + 'yr streak')
+            )
+          ),
+          returnCalc && e('div', { style: s.card },
+            e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px' } }, 'Investment Summary'),
+            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' } },
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Invested: '), e('strong', null, formatCurrency(investmentAmount))),
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Final: '), e('strong', { style: { color: '#58a6ff' } }, formatCurrency(returnCalc.totalReturn))),
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Dividends: '), e('strong', { style: { color: '#3fb950' } }, formatCurrency(returnCalc.totalDividendIncome))),
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Period: '), e('strong', null, returnCalc.years.toFixed(1) + ' yrs'))
+            )
+          ),
+          divAnalysis && divAnalysis.yearlyData && divAnalysis.yearlyData.length > 0 && e('div', { style: s.card },
+            e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '8px' } }, 'Dividend Analysis'),
+            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '12px' } },
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Frequency'), e('br'), e('strong', null, divAnalysis.frequency)),
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Latest'), e('br'), e('strong', { style: { color: '#3fb950' } }, formatCurrency(divAnalysis.latestDividend))),
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Annual'), e('br'), e('strong', null, formatCurrency(divAnalysis.ttmDividendTotal)))
+            ),
+            e(DividendChart, { data: divAnalysis.yearlyData })
+          ),
+          e('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto' } },
+            ['dividends', 'splits', 'upcoming'].map(function(tab) {
+              var cnt = tab === 'dividends' ? dividends.length : tab === 'splits' ? splits.length : stats.upcomingDividends.length + stats.upcomingSplits.length;
+              return e('button', { key: tab, onClick: function() { setActiveTab(tab); }, style: { padding: '10px 16px', background: activeTab === tab ? 'rgba(31,111,235,0.2)' : 'rgba(48,54,61,0.3)', border: activeTab === tab ? '1px solid rgba(31,111,235,0.5)' : '1px solid transparent', borderRadius: '8px', color: activeTab === tab ? '#58a6ff' : '#8b949e', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', cursor: 'pointer' } }, tab.charAt(0).toUpperCase() + tab.slice(1) + ' (' + cnt + ')');
+            })
+          ),
+          activeTab === 'dividends' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
+            dividends.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No dividend history') :
+            e('div', { style: { maxHeight: '400px', overflowY: 'auto' } },
+              dividends.slice(0, 50).map(function(div, i) {
+                return e('div', { key: div.id || i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
+                  e('div', null, e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(div.ex_dividend_date)), e('div', { style: { fontSize: '11px', color: '#8b949e' } }, 'Pay: ' + (div.pay_date ? formatDate(div.pay_date) : 'TBD'))),
+                  e('div', { style: { textAlign: 'right' } }, e('div', { style: { fontSize: '16px', fontWeight: '600', color: '#3fb950' } }, formatCurrency(div.cash_amount)), e('div', { style: { fontSize: '10px', padding: '2px 6px', background: div.dividend_type === 'CD' ? 'rgba(46,160,67,0.15)' : 'rgba(187,128,9,0.15)', color: div.dividend_type === 'CD' ? '#3fb950' : '#d29922', borderRadius: '4px', display: 'inline-block' } }, div.dividend_type === 'CD' ? 'Regular' : div.dividend_type === 'SC' ? 'Special' : 'Cash'))
+                );
+              })
+            )
+          ),
+          activeTab === 'splits' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
+            splits.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No stock splits') :
+            e('div', null, splits.map(function(sp, i) {
+              var rev = sp.split_from > sp.split_to;
+              return e('div', { key: sp.id || i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
+                e('div', null, e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(sp.execution_date)), e('div', { style: { fontSize: '12px', color: rev ? '#f85149' : '#3fb950' } }, rev ? 'Reverse' : 'Forward')),
+                e('div', { style: { fontSize: '20px', fontWeight: '700', color: '#58a6ff', fontFamily: 'monospace' } }, sp.split_to + ':' + sp.split_from)
+              );
+            }))
+          ),
+          activeTab === 'upcoming' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
+            (stats.upcomingDividends.length === 0 && stats.upcomingSplits.length === 0) ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No upcoming events') :
+            e('div', null,
+              stats.upcomingDividends.map(function(div, i) {
+                return e('div', { key: 'div-' + i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
+                  e('div', { style: { width: '40px', height: '40px', background: 'rgba(46,160,67,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' } }, '💰'),
+                  e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: '600' } }, 'Dividend: ' + formatCurrency(div.cash_amount)), e('div', { style: { fontSize: '12px', color: '#8b949e' } }, 'Ex-div: ' + formatDate(div.ex_dividend_date)))
+                );
+              }),
+              stats.upcomingSplits.map(function(sp, i) {
+                return e('div', { key: 'sp-' + i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: '1px solid rgba(48,54,61,0.4)' } },
+                  e('div', { style: { width: '40px', height: '40px', background: 'rgba(31,111,235,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' } }, '✂️'),
+                  e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: '600' } }, 'Split: ' + sp.split_to + ':' + sp.split_from), e('div', { style: { fontSize: '12px', color: '#8b949e' } }, formatDate(sp.execution_date)))
+                );
+              })
+            )
+          )
+        ),
+        e('div', { style: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(13,17,23,0.95)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(48,54,61,0.6)', padding: '12px 16px', display: 'flex', gap: '8px' } },
+          e('input', { type: 'text', value: ticker, onChange: function(ev) { setTicker(ev.target.value.toUpperCase()); }, placeholder: 'Ticker', style: Object.assign({}, s.input, { flex: 1, padding: '12px' }) }),
+          e('button', { onClick: fetchData, disabled: loading || !ticker, style: { padding: '12px 24px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', opacity: (loading || !ticker) ? 0.6 : 1, cursor: 'pointer' } }, loading ? '...' : 'Go')
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(e(App));
   </script>
 </body>
 </html>
