@@ -21,6 +21,8 @@
     .loading-logo { width: 80px; height: 80px; background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; color: white; margin-bottom: 24px; animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); opacity: 0.8; } }
     .loading-text { color: #8b949e; font-size: 14px; }
+    .tooltip { position: relative; cursor: help; }
+    .tooltip:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; white-space: normal; width: 200px; z-index: 1000; text-align: left; line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -39,16 +41,16 @@
       var data = props.data;
       if (!data || !data.length) return null;
       var maxVal = Math.max.apply(null, data.map(function(d) { return d.total; }));
-      var recent = data.slice(-8);
+      var recent = data.slice(-10);
       return e('div', { style: { marginTop: '16px' } },
-        e('div', { style: { fontSize: '12px', color: '#8b949e', marginBottom: '12px' } }, 'Annual Dividend History'),
-        e('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px' } },
+        e('div', { style: { fontSize: '12px', color: '#8b949e', marginBottom: '12px' } }, 'Annual Dividend History (Selected Period)'),
+        e('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '4px', height: '80px' } },
           recent.map(function(item, i) {
             var h = maxVal > 0 ? (item.total / maxVal) * 100 : 0;
             var grow = i > 0 && item.total > recent[i-1].total;
             var dec = i > 0 && item.total < recent[i-1].total;
             return e('div', { key: item.year, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
-              e('div', { style: { width: '100%', height: h + '%', minHeight: '4px', background: dec ? '#f85149' : grow ? '#3fb950' : '#58a6ff', borderRadius: '3px 3px 0 0' } }),
+              e('div', { style: { width: '100%', height: h + '%', minHeight: '4px', background: dec ? '#f85149' : grow ? '#3fb950' : '#58a6ff', borderRadius: '3px 3px 0 0' }, title: item.year + ': ' + formatCurrency(item.total) }),
               e('div', { style: { fontSize: '9px', color: '#8b949e', marginTop: '4px' } }, "'" + String(item.year).slice(-2))
             );
           })
@@ -73,6 +75,7 @@
       var _returns = useState(null), returnCalc = _returns[0], setReturnCalc = _returns[1];
       var _tab = useState('dividends'), activeTab = _tab[0], setActiveTab = _tab[1];
       var _price = useState(null), currentPrice = _price[0], setCurrentPrice = _price[1];
+      var _reinvest = useState(false), reinvestDividends = _reinvest[0], setReinvestDividends = _reinvest[1];
       var _recent = useState(function() { try { return JSON.parse(localStorage.getItem('recentSearches') || '[]'); } catch(e) { return []; } }), recentSearches = _recent[0], setRecentSearches = _recent[1];
 
       useEffect(function() { if (apiKey) localStorage.setItem('polygonApiKey', apiKey); }, [apiKey]);
@@ -84,23 +87,76 @@
         localStorage.setItem('recentSearches', JSON.stringify(updated));
       }
 
-      function calcReturns(prices, divs, splts) {
+      // Filter dividends to selected date range
+      function getFilteredDividends(divs) {
+        var start = new Date(investmentDate);
+        var end = new Date(endDate);
+        return divs.filter(function(d) {
+          var exDate = new Date(d.ex_dividend_date);
+          return exDate >= start && exDate <= end;
+        });
+      }
+
+      function calcReturns(prices, divs, splts, reinvest) {
         if (!prices || prices.length < 2) return;
         var startP = prices[0].c, endP = prices[prices.length - 1].c;
         var startD = new Date(prices[0].t), endD = new Date(prices[prices.length - 1].t);
-        var shares = investmentAmount / startP, adjShares = shares;
+        var shares = investmentAmount / startP;
+        
+        // Apply splits
+        var adjShares = shares;
         splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; })
           .forEach(function(s) { adjShares = adjShares * (s.split_to / s.split_from); });
-        var relDivs = divs.filter(function(d) { var pd = new Date(d.pay_date); return pd >= startD && pd <= endD; });
-        var divIncome = 0; relDivs.forEach(function(d) { divIncome += d.cash_amount * adjShares; });
-        var endVal = adjShares * endP, total = endVal + divIncome;
+        
+        // Filter dividends to date range
+        var relDivs = divs.filter(function(d) { 
+          var exDate = new Date(d.ex_dividend_date);
+          return exDate >= startD && exDate <= endD; 
+        });
+        
+        var divIncome = 0;
+        var reinvestedShares = adjShares;
+        
+        if (reinvest) {
+          // DRIP: reinvest dividends at approximate price
+          relDivs.forEach(function(d) {
+            var divAmount = d.cash_amount * reinvestedShares;
+            // Find approximate price at dividend date
+            var divDate = new Date(d.pay_date || d.ex_dividend_date).getTime();
+            var priceAtDiv = endP; // default to end price
+            for (var i = 0; i < prices.length; i++) {
+              if (prices[i].t >= divDate) {
+                priceAtDiv = prices[i].c;
+                break;
+              }
+            }
+            var newShares = divAmount / priceAtDiv;
+            reinvestedShares += newShares;
+            divIncome += divAmount;
+          });
+          var endVal = reinvestedShares * endP;
+          var total = endVal;
+        } else {
+          // Cash dividends
+          relDivs.forEach(function(d) { divIncome += d.cash_amount * adjShares; });
+          var endVal = adjShares * endP;
+          var total = endVal + divIncome;
+          reinvestedShares = adjShares;
+        }
+        
         var pctRet = ((total - investmentAmount) / investmentAmount) * 100;
         var yrs = (endD - startD) / (365.25 * 24 * 60 * 60 * 1000);
         var annRet = yrs > 0 ? (Math.pow(total / investmentAmount, 1/yrs) - 1) * 100 : 0;
-        setReturnCalc({ startPrice: startP, endPrice: endP, sharesPurchased: shares, adjustedShares: adjShares,
-          totalDividendIncome: divIncome, endingShareValue: endVal, totalReturn: total, percentReturn: pctRet,
-          annualizedReturn: annRet, years: yrs, priceReturn: ((endP - startP) / startP) * 100,
-          dividendCount: relDivs.length, splitCount: splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; }).length });
+        
+        setReturnCalc({ 
+          startPrice: startP, endPrice: endP, sharesPurchased: shares, adjustedShares: adjShares,
+          finalShares: reinvestedShares, totalDividendIncome: divIncome, endingShareValue: reinvest ? total : endVal, 
+          totalReturn: total, percentReturn: pctRet, annualizedReturn: annRet, years: yrs, 
+          priceReturn: ((endP - startP) / startP) * 100,
+          dividendCount: relDivs.length, 
+          splitCount: splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; }).length,
+          reinvested: reinvest
+        });
       }
 
       function fetchData() {
@@ -117,78 +173,138 @@
         ]).then(function(res) { return Promise.all(res.map(function(r) { return r.json(); })); })
         .then(function(data) {
           var divD = data[0], splitD = data[1], detD = data[2], priceD = data[3], prevD = data[4];
-          if (divD.status === 'OK') setDividends(divD.results || []);
-          if (splitD.status === 'OK') setSplits(splitD.results || []);
+          var allDivs = divD.status === 'OK' ? (divD.results || []) : [];
+          var allSplits = splitD.status === 'OK' ? (splitD.results || []) : [];
+          setDividends(allDivs);
+          setSplits(allSplits);
           if (detD.status === 'OK') setTickerDetails(detD.results);
           if (prevD.status === 'OK' && prevD.results && prevD.results[0]) setCurrentPrice(prevD.results[0].c);
           if (priceD.status === 'OK' && priceD.results && priceD.results.length > 0) {
             setPriceData(priceD.results);
-            calcReturns(priceD.results, divD.results || [], splitD.results || []);
+            calcReturns(priceD.results, allDivs, allSplits, reinvestDividends);
           }
           setShowSetup(false); setLoading(false);
         }).catch(function(err) { setError(err.message || 'Failed to fetch'); setLoading(false); });
       }
 
-      useEffect(function() { if (priceData && dividends && splits) calcReturns(priceData, dividends, splits); }, [investmentAmount]);
+      useEffect(function() { 
+        if (priceData && dividends && splits) calcReturns(priceData, dividends, splits, reinvestDividends); 
+      }, [investmentAmount, reinvestDividends]);
+
+      // Get filtered dividends for display and analysis
+      var filteredDividends = useMemo(function() {
+        return getFilteredDividends(dividends);
+      }, [dividends, investmentDate, endDate]);
+
+      var filteredSplits = useMemo(function() {
+        var start = new Date(investmentDate);
+        var end = new Date(endDate);
+        return splits.filter(function(s) {
+          var d = new Date(s.execution_date);
+          return d >= start && d <= end;
+        });
+      }, [splits, investmentDate, endDate]);
 
       var divAnalysis = useMemo(function() {
-        if (!dividends.length || !currentPrice) return null;
-        var now = new Date(), oneYrAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        var ttm = dividends.filter(function(d) { var ex = new Date(d.ex_dividend_date); return ex >= oneYrAgo && ex <= now; });
-        var ttmTotal = 0; ttm.forEach(function(d) { ttmTotal += d.cash_amount; });
-        var yld = currentPrice > 0 ? (ttmTotal / currentPrice) * 100 : 0;
-        var byYear = {}; dividends.forEach(function(d) { var y = new Date(d.ex_dividend_date).getFullYear(); byYear[y] = (byYear[y] || 0) + d.cash_amount; });
+        if (!filteredDividends.length || !currentPrice) return null;
+        
+        // Calculate annual dividend within period
+        var start = new Date(investmentDate);
+        var end = new Date(endDate);
+        var periodYears = (end - start) / (365.25 * 24 * 60 * 60 * 1000);
+        
+        var totalDiv = 0;
+        filteredDividends.forEach(function(d) { totalDiv += d.cash_amount; });
+        var annualizedDiv = periodYears > 0 ? totalDiv / periodYears : totalDiv;
+        var yld = currentPrice > 0 ? (annualizedDiv / currentPrice) * 100 : 0;
+        
+        // Group by year within period
+        var byYear = {};
+        filteredDividends.forEach(function(d) { 
+          var y = new Date(d.ex_dividend_date).getFullYear(); 
+          byYear[y] = (byYear[y] || 0) + d.cash_amount; 
+        });
         var yrs = Object.keys(byYear).sort();
         var yearly = yrs.map(function(y) { return { year: parseInt(y), total: byYear[y] }; });
-        function cagr(n) { if (yearly.length < n + 1) return null; var r = yearly.slice(-n - 1); if (r.length < 2 || r[0].total <= 0 || r[r.length-1].total <= 0) return null; return (Math.pow(r[r.length-1].total / r[0].total, 1/n) - 1) * 100; }
-        var yoy = yearly.length >= 2 ? ((yearly[yearly.length-1].total / yearly[yearly.length-2].total) - 1) * 100 : null;
-        var freqMap = {}; dividends.forEach(function(d) { var f = d.frequency || 0; freqMap[f] = (freqMap[f] || 0) + 1; });
+        
+        // CAGR within period
+        function cagr(n) { 
+          if (yearly.length < n + 1) return null; 
+          var r = yearly.slice(-n - 1); 
+          if (r.length < 2 || r[0].total <= 0 || r[r.length-1].total <= 0) return null; 
+          return (Math.pow(r[r.length-1].total / r[0].total, 1/n) - 1) * 100; 
+        }
+        
+        // Consecutive years with dividends in period
+        var consec = yearly.length;
+        
+        // Frequency detection
+        var freqMap = {};
+        filteredDividends.forEach(function(d) { var f = d.frequency || 0; freqMap[f] = (freqMap[f] || 0) + 1; });
         var freqLabels = { '0': 'One-time', '1': 'Annual', '2': 'Semi-Annual', '4': 'Quarterly', '12': 'Monthly' };
         var topFreq = Object.entries(freqMap).sort(function(a, b) { return b[1] - a[1]; })[0];
-        var consec = 0, curYr = now.getFullYear(), sortedYrs = yrs.map(function(y) { return parseInt(y); }).sort(function(a,b) { return b - a; });
-        for (var i = 0; i < sortedYrs.length; i++) { if (sortedYrs[i] === curYr - i || sortedYrs[i] === curYr - i - 1) consec++; else break; }
-        return { currentYield: yld, ttmDividendTotal: ttmTotal, yearlyData: yearly, cagr1Year: yoy, cagr3Year: cagr(3), cagr5Year: cagr(5),
-          frequency: freqLabels[topFreq ? topFreq[0] : '0'] || 'Variable', consecutiveYears: consec, latestDividend: dividends[0] ? dividends[0].cash_amount : 0 };
-      }, [dividends, currentPrice]);
+        
+        return { 
+          currentYield: yld, 
+          annualizedDividend: annualizedDiv,
+          totalDividendInPeriod: totalDiv,
+          yearlyData: yearly, 
+          cagr3Year: cagr(3), 
+          cagr5Year: cagr(5),
+          periodYears: periodYears,
+          frequency: freqLabels[topFreq ? topFreq[0] : '0'] || 'Variable', 
+          consecutiveYears: consec, 
+          latestDividend: filteredDividends[0] ? filteredDividends[0].cash_amount : 0,
+          dividendCount: filteredDividends.length
+        };
+      }, [filteredDividends, currentPrice, investmentDate, endDate]);
 
       var stats = useMemo(function() {
         var now = new Date();
-        return { totalDividends: dividends.length, totalSplits: splits.length,
+        var start = new Date(investmentDate);
+        var end = new Date(endDate);
+        return { 
+          totalDividends: filteredDividends.length, 
+          totalSplits: filteredSplits.length,
           upcomingDividends: dividends.filter(function(d) { return new Date(d.ex_dividend_date) > now; }),
-          upcomingSplits: splits.filter(function(s) { return new Date(s.execution_date) > now; }) };
-      }, [dividends, splits]);
+          upcomingSplits: splits.filter(function(s) { return new Date(s.execution_date) > now; }) 
+        };
+      }, [filteredDividends, filteredSplits, dividends, splits]);
 
       var s = {
-        container: { minHeight: '100vh', background: 'linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%)', paddingBottom: '80px' },
+        container: { minHeight: '100vh', background: 'linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%)', paddingBottom: '20px' },
         header: { background: 'rgba(13,17,23,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(48,54,61,0.6)', padding: '16px', position: 'sticky', top: 0, zIndex: 100 },
         card: { background: 'rgba(13,17,23,0.6)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '12px', padding: '16px', marginBottom: '12px' },
         input: { width: '100%', padding: '14px 16px', background: 'rgba(13,17,23,0.6)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '10px', color: '#e6edf3', fontSize: '16px', outline: 'none', boxSizing: 'border-box' },
         btn: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: '600', cursor: 'pointer' },
         label: { display: 'block', marginBottom: '8px', fontSize: '13px', color: '#8b949e', fontWeight: '500' },
-        metric: { fontSize: '11px', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }
+        metric: { fontSize: '11px', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' },
+        link: { color: '#58a6ff', textDecoration: 'none', fontSize: '12px' }
       };
 
+      // Setup/Search screen - always show this layout for new searches
       if (showSetup) {
         return e('div', { style: s.container },
           e('header', { style: s.header },
             e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
               e('div', { style: { width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', color: 'white' } }, 'CA'),
-              e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, 'Corp Actions')
+              e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, 'Corporate Actions Tracker')
             )
           ),
           e('main', { style: { padding: '16px' } },
             e('div', { style: s.card },
-              e('h2', { style: { margin: '0 0 8px', fontSize: '18px', fontWeight: '600' } }, 'Get Started'),
-              e('p', { style: { margin: '0 0 20px', color: '#8b949e', fontSize: '14px' } }, 'Enter your Polygon.io API key and a stock ticker.'),
+              e('h2', { style: { margin: '0 0 8px', fontSize: '18px', fontWeight: '600' } }, searchedTicker ? 'New Search' : 'Get Started'),
+              e('p', { style: { margin: '0 0 20px', color: '#8b949e', fontSize: '14px' } }, 'Enter your Massive (Polygon.io) API key and a stock ticker.'),
+              
               e('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
                 e('div', null,
                   e('label', { style: s.label }, 'API Key'),
-                  e('input', { type: 'password', value: apiKey, onChange: function(ev) { setApiKey(ev.target.value); }, placeholder: 'Your Polygon.io API key', style: s.input }),
-                  e('a', { href: 'https://polygon.io', target: '_blank', style: { fontSize: '12px', color: '#58a6ff', display: 'block', marginTop: '6px' } }, 'Get free API key →')
+                  e('input', { type: 'password', value: apiKey, onChange: function(ev) { setApiKey(ev.target.value); }, placeholder: 'Your Massive/Polygon.io API key', style: s.input }),
+                  e('a', { href: 'https://massive.com', target: '_blank', style: { fontSize: '12px', color: '#58a6ff', display: 'block', marginTop: '6px' } }, 'Get free API key at massive.com →')
                 ),
                 e('div', null,
                   e('label', { style: s.label }, 'Stock Ticker'),
-                  e('input', { type: 'text', value: ticker, onChange: function(ev) { setTicker(ev.target.value.toUpperCase()); }, placeholder: 'e.g. AAPL, MSFT', style: s.input }),
+                  e('input', { type: 'text', value: ticker, onChange: function(ev) { setTicker(ev.target.value.toUpperCase()); }, placeholder: 'e.g. AAPL, MSFT, JNJ', style: s.input }),
                   recentSearches.length > 0 && e('div', { style: { display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' } },
                     recentSearches.map(function(t) { return e('button', { key: t, onClick: function() { setTicker(t); }, style: { padding: '6px 12px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)', borderRadius: '6px', color: '#58a6ff', fontSize: '12px', cursor: 'pointer' } }, t); })
                   )
@@ -197,31 +313,61 @@
                   e('div', null, e('label', { style: s.label }, 'Start Date'), e('input', { type: 'date', value: investmentDate, onChange: function(ev) { setInvestmentDate(ev.target.value); }, style: s.input })),
                   e('div', null, e('label', { style: s.label }, 'End Date'), e('input', { type: 'date', value: endDate, onChange: function(ev) { setEndDate(ev.target.value); }, style: s.input }))
                 ),
-                e('div', null, e('label', { style: s.label }, 'Investment Amount ($)'), e('input', { type: 'number', value: investmentAmount, onChange: function(ev) { setInvestmentAmount(parseFloat(ev.target.value) || 0); }, style: s.input })),
-                e('button', { onClick: fetchData, disabled: loading || !ticker || !apiKey, style: Object.assign({}, s.btn, { opacity: (loading || !ticker || !apiKey) ? 0.6 : 1 }) }, loading ? 'Loading...' : 'Analyse')
+                e('div', null, 
+                  e('label', { style: s.label }, 'Investment Amount ($)'), 
+                  e('input', { type: 'number', value: investmentAmount, onChange: function(ev) { setInvestmentAmount(parseFloat(ev.target.value) || 0); }, style: s.input })
+                ),
+                e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(48,54,61,0.3)', borderRadius: '8px' } },
+                  e('input', { type: 'checkbox', id: 'reinvest', checked: reinvestDividends, onChange: function(ev) { setReinvestDividends(ev.target.checked); }, style: { width: '20px', height: '20px' } }),
+                  e('label', { htmlFor: 'reinvest', style: { fontSize: '14px', cursor: 'pointer' } }, 'Reinvest dividends (DRIP)'),
+                  e('span', { style: { fontSize: '12px', color: '#8b949e', marginLeft: 'auto' } }, reinvestDividends ? 'Dividends buy more shares' : 'Dividends taken as cash')
+                ),
+                e('button', { onClick: fetchData, disabled: loading || !ticker || !apiKey, style: Object.assign({}, s.btn, { opacity: (loading || !ticker || !apiKey) ? 0.6 : 1 }) }, loading ? 'Loading...' : 'Analyse Corporate Actions')
               )
             ),
-            error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', color: '#f85149', fontSize: '14px' } }, error)
+            error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', color: '#f85149', fontSize: '14px' } }, error),
+            e('div', { style: { marginTop: '20px', padding: '16px', background: 'rgba(48,54,61,0.2)', borderRadius: '12px' } },
+              e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '8px' } }, 'What are Corporate Actions?'),
+              e('p', { style: { fontSize: '13px', color: '#8b949e', marginBottom: '12px', lineHeight: '1.5' } }, 
+                'Corporate actions are events initiated by companies that affect shareholders. Common types include dividends, stock splits, mergers, acquisitions, spin-offs, rights issues, and buybacks.'),
+              e('a', { href: 'https://www.investopedia.com/terms/c/corporateaction.asp', target: '_blank', style: s.link }, 'Learn more about corporate actions →')
+            )
           )
         );
       }
 
+      // Results screen
       return e('div', { style: s.container },
         e('header', { style: s.header },
           e('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
             e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
               e('div', { style: { width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', color: 'white' } }, 'CA'),
-              e('div', null, e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, 'Corp Actions'), searchedTicker && e('p', { style: { margin: 0, fontSize: '12px', color: '#58a6ff' } }, searchedTicker))
+              e('div', null, e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, searchedTicker), tickerDetails && e('p', { style: { margin: 0, fontSize: '11px', color: '#8b949e' } }, tickerDetails.name))
             ),
-            e('button', { onClick: function() { setShowSetup(true); }, style: { padding: '8px 12px', background: 'rgba(48,54,61,0.5)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '8px', color: '#8b949e', fontSize: '12px', cursor: 'pointer' } }, 'Settings')
+            e('button', { onClick: function() { setShowSetup(true); }, style: { padding: '8px 16px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' } }, 'New Search')
           )
         ),
         e('main', { style: { padding: '16px' } },
           error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', marginBottom: '12px', color: '#f85149', fontSize: '14px' } }, error),
-          tickerDetails && e('div', { style: Object.assign({}, s.card, { display: 'flex', alignItems: 'center', gap: '12px' }) },
-            e('div', { style: { flex: 1 } }, e('div', { style: { fontSize: '20px', fontWeight: '700' } }, searchedTicker), e('div', { style: { fontSize: '13px', color: '#8b949e' } }, tickerDetails.name)),
-            currentPrice && e('div', { style: { textAlign: 'right' } }, e('div', { style: { fontSize: '24px', fontWeight: '700' } }, formatCurrency(currentPrice)), divAnalysis && e('div', { style: { fontSize: '12px', color: '#3fb950' } }, divAnalysis.currentYield.toFixed(2) + '% yield'))
+          
+          // Period info
+          e('div', { style: { fontSize: '12px', color: '#8b949e', marginBottom: '12px', textAlign: 'center' } }, 
+            'Analysis period: ' + formatDate(investmentDate) + ' to ' + formatDate(endDate)
           ),
+
+          // Company info with price
+          tickerDetails && e('div', { style: Object.assign({}, s.card, { display: 'flex', alignItems: 'center', gap: '12px' }) },
+            e('div', { style: { flex: 1 } },
+              e('div', { style: { fontSize: '20px', fontWeight: '700' } }, searchedTicker),
+              e('div', { style: { fontSize: '13px', color: '#8b949e' } }, tickerDetails.name)
+            ),
+            currentPrice && e('div', { style: { textAlign: 'right' } },
+              e('div', { style: { fontSize: '24px', fontWeight: '700' } }, formatCurrency(currentPrice)),
+              divAnalysis && divAnalysis.currentYield > 0 && e('div', { style: { fontSize: '12px', color: '#3fb950' } }, divAnalysis.currentYield.toFixed(2) + '% yield')
+            )
+          ),
+
+          // Key metrics row
           e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' } },
             returnCalc && e('div', { style: Object.assign({}, s.card, { marginBottom: 0, background: 'linear-gradient(135deg, rgba(46,160,67,0.15) 0%, rgba(35,134,54,0.1) 100%)', border: '1px solid rgba(46,160,67,0.3)' }) },
               e('div', { style: s.metric }, 'Total Return'),
@@ -229,77 +375,164 @@
               e('div', { style: { fontSize: '11px', color: '#8b949e' } }, returnCalc.annualizedReturn.toFixed(1) + '% p.a.')
             ),
             divAnalysis && e('div', { style: Object.assign({}, s.card, { marginBottom: 0 }) },
-              e('div', { style: s.metric }, '5Y Div Growth'),
-              e('div', { style: { fontSize: '24px', fontWeight: '700', color: divAnalysis.cagr5Year !== null && divAnalysis.cagr5Year >= 0 ? '#3fb950' : '#f85149' } }, divAnalysis.cagr5Year !== null ? formatPercent(divAnalysis.cagr5Year) : 'N/A'),
-              e('div', { style: { fontSize: '11px', color: '#8b949e' } }, divAnalysis.consecutiveYears + 'yr streak')
+              e('div', { style: Object.assign({}, s.metric, { display: 'flex', alignItems: 'center', gap: '4px' }) }, 
+                'Div Growth',
+                e('span', { 
+                  className: 'tooltip',
+                  'data-tip': 'Compound Annual Growth Rate of dividends over ' + (divAnalysis.cagr5Year !== null ? '5' : divAnalysis.cagr3Year !== null ? '3' : 'N/A') + ' years within your selected date range. Streak = consecutive years with dividend payments in period.',
+                  style: { cursor: 'help', color: '#58a6ff' }
+                }, 'ⓘ')
+              ),
+              e('div', { style: { fontSize: '24px', fontWeight: '700', color: (divAnalysis.cagr5Year !== null && divAnalysis.cagr5Year >= 0) || (divAnalysis.cagr3Year !== null && divAnalysis.cagr3Year >= 0) ? '#3fb950' : divAnalysis.cagr5Year !== null || divAnalysis.cagr3Year !== null ? '#f85149' : '#8b949e' } }, 
+                divAnalysis.cagr5Year !== null ? formatPercent(divAnalysis.cagr5Year) + ' (5Y)' : divAnalysis.cagr3Year !== null ? formatPercent(divAnalysis.cagr3Year) + ' (3Y)' : 'N/A'
+              ),
+              e('div', { style: { fontSize: '11px', color: '#8b949e' } }, divAnalysis.consecutiveYears + ' yr' + (divAnalysis.consecutiveYears !== 1 ? 's' : '') + ' in period')
             )
           ),
-          returnCalc && e('div', { style: s.card },
-            e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px' } }, 'Investment Summary'),
-            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' } },
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Invested: '), e('strong', null, formatCurrency(investmentAmount))),
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Final: '), e('strong', { style: { color: '#58a6ff' } }, formatCurrency(returnCalc.totalReturn))),
+
+          // Investment Results
+          returnCalc && e('div', { style: Object.assign({}, s.card, { background: 'linear-gradient(135deg, rgba(88,166,255,0.1) 0%, rgba(31,111,235,0.05) 100%)', border: '1px solid rgba(88,166,255,0.3)' }) },
+            e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
+              e('div', { style: { fontSize: '14px', fontWeight: '600' } }, 'Investment Result'),
+              e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                e('span', { style: { fontSize: '12px', color: '#8b949e' } }, returnCalc.reinvested ? 'DRIP' : 'Cash divs'),
+                e('button', { 
+                  onClick: function() { setReinvestDividends(!reinvestDividends); },
+                  style: { padding: '4px 10px', background: 'rgba(48,54,61,0.5)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '6px', color: '#58a6ff', fontSize: '11px', cursor: 'pointer' }
+                }, 'Toggle')
+              )
+            ),
+            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' } },
+              e('div', { style: { padding: '12px', background: 'rgba(13,17,23,0.4)', borderRadius: '8px' } },
+                e('div', { style: { fontSize: '11px', color: '#8b949e', marginBottom: '4px' } }, 'Initial Investment'),
+                e('div', { style: { fontSize: '20px', fontWeight: '700' } }, formatCurrency(investmentAmount))
+              ),
+              e('div', { style: { padding: '12px', background: 'rgba(46,160,67,0.15)', borderRadius: '8px' } },
+                e('div', { style: { fontSize: '11px', color: '#8b949e', marginBottom: '4px' } }, 'Final Value'),
+                e('div', { style: { fontSize: '20px', fontWeight: '700', color: '#3fb950' } }, formatCurrency(returnCalc.totalReturn))
+              )
+            ),
+            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '12px', fontSize: '12px' } },
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Shares: '), e('strong', null, returnCalc.sharesPurchased.toFixed(2) + ' → ' + returnCalc.finalShares.toFixed(2))),
               e('div', null, e('span', { style: { color: '#8b949e' } }, 'Dividends: '), e('strong', { style: { color: '#3fb950' } }, formatCurrency(returnCalc.totalDividendIncome))),
               e('div', null, e('span', { style: { color: '#8b949e' } }, 'Period: '), e('strong', null, returnCalc.years.toFixed(1) + ' yrs'))
+            ),
+            returnCalc.reinvested && e('div', { style: { marginTop: '12px', padding: '8px 12px', background: 'rgba(46,160,67,0.1)', borderRadius: '6px', fontSize: '12px', color: '#8b949e' } },
+              'With DRIP, ' + formatCurrency(returnCalc.totalDividendIncome) + ' in dividends purchased ' + (returnCalc.finalShares - returnCalc.adjustedShares).toFixed(2) + ' additional shares'
             )
           ),
-          divAnalysis && divAnalysis.yearlyData && divAnalysis.yearlyData.length > 0 && e('div', { style: s.card },
-            e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '8px' } }, 'Dividend Analysis'),
+
+          // Dividend Analysis (only show if there are dividends in period)
+          divAnalysis && divAnalysis.dividendCount > 0 && e('div', { style: s.card },
+            e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px' } }, 'Dividend Analysis (Selected Period)'),
             e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '12px' } },
               e('div', null, e('span', { style: { color: '#8b949e' } }, 'Frequency'), e('br'), e('strong', null, divAnalysis.frequency)),
               e('div', null, e('span', { style: { color: '#8b949e' } }, 'Latest'), e('br'), e('strong', { style: { color: '#3fb950' } }, formatCurrency(divAnalysis.latestDividend))),
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Annual'), e('br'), e('strong', null, formatCurrency(divAnalysis.ttmDividendTotal)))
+              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Total in Period'), e('br'), e('strong', null, formatCurrency(divAnalysis.totalDividendInPeriod)))
             ),
-            e(DividendChart, { data: divAnalysis.yearlyData })
+            divAnalysis.yearlyData && divAnalysis.yearlyData.length > 0 && e(DividendChart, { data: divAnalysis.yearlyData })
           ),
+          
+          // No dividends message
+          divAnalysis && divAnalysis.dividendCount === 0 && e('div', { style: Object.assign({}, s.card, { background: 'rgba(187,128,9,0.1)', border: '1px solid rgba(187,128,9,0.3)' }) },
+            e('div', { style: { fontSize: '14px', fontWeight: '600', color: '#d29922', marginBottom: '8px' } }, 'No Dividends in Selected Period'),
+            e('div', { style: { fontSize: '13px', color: '#8b949e' } }, 
+              searchedTicker === 'BA' ? 'Boeing suspended its dividend in March 2020 due to the 737 MAX crisis and COVID-19 pandemic. The company had paid dividends for 78 consecutive years before the suspension.' :
+              'This stock did not pay any dividends during your selected date range (' + formatDate(investmentDate) + ' to ' + formatDate(endDate) + ').'
+            )
+          ),
+
+          // Tabs
           e('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto' } },
             ['dividends', 'splits', 'upcoming'].map(function(tab) {
-              var cnt = tab === 'dividends' ? dividends.length : tab === 'splits' ? splits.length : stats.upcomingDividends.length + stats.upcomingSplits.length;
+              var cnt = tab === 'dividends' ? filteredDividends.length : tab === 'splits' ? filteredSplits.length : stats.upcomingDividends.length + stats.upcomingSplits.length;
               return e('button', { key: tab, onClick: function() { setActiveTab(tab); }, style: { padding: '10px 16px', background: activeTab === tab ? 'rgba(31,111,235,0.2)' : 'rgba(48,54,61,0.3)', border: activeTab === tab ? '1px solid rgba(31,111,235,0.5)' : '1px solid transparent', borderRadius: '8px', color: activeTab === tab ? '#58a6ff' : '#8b949e', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', cursor: 'pointer' } }, tab.charAt(0).toUpperCase() + tab.slice(1) + ' (' + cnt + ')');
             })
           ),
+
+          // Dividends tab
           activeTab === 'dividends' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
-            dividends.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No dividend history') :
+            filteredDividends.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No dividends in selected period') :
             e('div', { style: { maxHeight: '400px', overflowY: 'auto' } },
-              dividends.slice(0, 50).map(function(div, i) {
+              filteredDividends.map(function(div, i) {
                 return e('div', { key: div.id || i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
-                  e('div', null, e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(div.ex_dividend_date)), e('div', { style: { fontSize: '11px', color: '#8b949e' } }, 'Pay: ' + (div.pay_date ? formatDate(div.pay_date) : 'TBD'))),
-                  e('div', { style: { textAlign: 'right' } }, e('div', { style: { fontSize: '16px', fontWeight: '600', color: '#3fb950' } }, formatCurrency(div.cash_amount)), e('div', { style: { fontSize: '10px', padding: '2px 6px', background: div.dividend_type === 'CD' ? 'rgba(46,160,67,0.15)' : 'rgba(187,128,9,0.15)', color: div.dividend_type === 'CD' ? '#3fb950' : '#d29922', borderRadius: '4px', display: 'inline-block' } }, div.dividend_type === 'CD' ? 'Regular' : div.dividend_type === 'SC' ? 'Special' : 'Cash'))
+                  e('div', null,
+                    e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(div.ex_dividend_date)),
+                    e('div', { style: { fontSize: '11px', color: '#8b949e' } }, 'Pay: ' + (div.pay_date ? formatDate(div.pay_date) : 'TBD')),
+                    e('a', { 
+                      href: 'https://massive.com/quote/' + searchedTicker, 
+                      target: '_blank', 
+                      style: { fontSize: '10px', color: '#58a6ff', textDecoration: 'none' }
+                    }, 'View on Massive →')
+                  ),
+                  e('div', { style: { textAlign: 'right' } },
+                    e('div', { style: { fontSize: '16px', fontWeight: '600', color: '#3fb950' } }, formatCurrency(div.cash_amount)),
+                    e('div', { style: { fontSize: '10px', padding: '2px 6px', background: div.dividend_type === 'CD' ? 'rgba(46,160,67,0.15)' : 'rgba(187,128,9,0.15)', color: div.dividend_type === 'CD' ? '#3fb950' : '#d29922', borderRadius: '4px', display: 'inline-block' } },
+                      div.dividend_type === 'CD' ? 'Regular' : div.dividend_type === 'SC' ? 'Special' : div.dividend_type === 'LT' ? 'Long-term' : div.dividend_type === 'ST' ? 'Short-term' : 'Cash'
+                    )
+                  )
                 );
               })
             )
           ),
+
+          // Splits tab
           activeTab === 'splits' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
-            splits.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No stock splits') :
-            e('div', null, splits.map(function(sp, i) {
+            filteredSplits.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No stock splits in selected period') :
+            e('div', null, filteredSplits.map(function(sp, i) {
               var rev = sp.split_from > sp.split_to;
               return e('div', { key: sp.id || i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
-                e('div', null, e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(sp.execution_date)), e('div', { style: { fontSize: '12px', color: rev ? '#f85149' : '#3fb950' } }, rev ? 'Reverse' : 'Forward')),
+                e('div', null, 
+                  e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(sp.execution_date)), 
+                  e('div', { style: { fontSize: '12px', color: rev ? '#f85149' : '#3fb950' } }, rev ? 'Reverse' : 'Forward'),
+                  e('a', { 
+                    href: 'https://massive.com/quote/' + searchedTicker, 
+                    target: '_blank', 
+                    style: { fontSize: '10px', color: '#58a6ff', textDecoration: 'none' }
+                  }, 'View on Massive →')
+                ),
                 e('div', { style: { fontSize: '20px', fontWeight: '700', color: '#58a6ff', fontFamily: 'monospace' } }, sp.split_to + ':' + sp.split_from)
               );
             }))
           ),
+
+          // Upcoming tab
           activeTab === 'upcoming' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
             (stats.upcomingDividends.length === 0 && stats.upcomingSplits.length === 0) ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No upcoming events') :
             e('div', null,
               stats.upcomingDividends.map(function(div, i) {
                 return e('div', { key: 'div-' + i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
                   e('div', { style: { width: '40px', height: '40px', background: 'rgba(46,160,67,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' } }, '💰'),
-                  e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: '600' } }, 'Dividend: ' + formatCurrency(div.cash_amount)), e('div', { style: { fontSize: '12px', color: '#8b949e' } }, 'Ex-div: ' + formatDate(div.ex_dividend_date)))
+                  e('div', { style: { flex: 1 } }, 
+                    e('div', { style: { fontWeight: '600' } }, 'Dividend: ' + formatCurrency(div.cash_amount)),
+                    e('div', { style: { fontSize: '12px', color: '#8b949e' } }, 'Ex-div: ' + formatDate(div.ex_dividend_date))
+                  )
                 );
               }),
               stats.upcomingSplits.map(function(sp, i) {
                 return e('div', { key: 'sp-' + i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: '1px solid rgba(48,54,61,0.4)' } },
                   e('div', { style: { width: '40px', height: '40px', background: 'rgba(31,111,235,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' } }, '✂️'),
-                  e('div', { style: { flex: 1 } }, e('div', { style: { fontWeight: '600' } }, 'Split: ' + sp.split_to + ':' + sp.split_from), e('div', { style: { fontSize: '12px', color: '#8b949e' } }, formatDate(sp.execution_date)))
+                  e('div', { style: { flex: 1 } }, 
+                    e('div', { style: { fontWeight: '600' } }, 'Split: ' + sp.split_to + ':' + sp.split_from),
+                    e('div', { style: { fontSize: '12px', color: '#8b949e' } }, formatDate(sp.execution_date))
+                  )
                 );
               })
             )
+          ),
+
+          // Footer with links
+          e('div', { style: { marginTop: '20px', padding: '16px', background: 'rgba(48,54,61,0.2)', borderRadius: '12px', fontSize: '12px' } },
+            e('div', { style: { marginBottom: '8px' } },
+              e('span', { style: { color: '#8b949e' } }, 'Data provided by '),
+              e('a', { href: 'https://massive.com', target: '_blank', style: s.link }, 'Massive (formerly Polygon.io)')
+            ),
+            e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px' } },
+              e('a', { href: 'https://www.investopedia.com/terms/c/corporateaction.asp', target: '_blank', style: s.link }, 'Learn about corporate actions'),
+              e('a', { href: 'https://en.wikipedia.org/wiki/Corporate_action', target: '_blank', style: s.link }, 'Types of corporate actions'),
+              e('a', { href: 'https://www.investor.gov/introduction-investing/investing-basics/glossary', target: '_blank', style: s.link }, 'Investment glossary')
+            )
           )
-        ),
-        e('div', { style: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(13,17,23,0.95)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(48,54,61,0.6)', padding: '12px 16px', display: 'flex', gap: '8px' } },
-          e('input', { type: 'text', value: ticker, onChange: function(ev) { setTicker(ev.target.value.toUpperCase()); }, placeholder: 'Ticker', style: Object.assign({}, s.input, { flex: 1, padding: '12px' }) }),
-          e('button', { onClick: fetchData, disabled: loading || !ticker, style: { padding: '12px 24px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: '600', opacity: (loading || !ticker) ? 0.6 : 1, cursor: 'pointer' } }, loading ? '...' : 'Go')
         )
       );
     }
