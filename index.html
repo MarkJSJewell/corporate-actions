@@ -7,22 +7,35 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Corp Actions">
-  <meta name="description" content="Track corporate actions, dividends, splits, and calculate investment returns">
   <title>Corporate Actions Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.svg">
-  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { height: 100%; width: 100%; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%); color: #e6edf3; -webkit-font-smoothing: antialiased; }
-    .loading-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
-    .loading-screen.hidden { display: none; }
-    .loading-logo { width: 80px; height: 80px; background: linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; color: white; margin-bottom: 24px; animation: pulse 2s ease-in-out infinite; }
-    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); opacity: 0.8; } }
-    .loading-text { color: #8b949e; font-size: 14px; }
-    .tooltip { position: relative; cursor: help; }
-    .tooltip:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 12px; white-space: normal; width: 200px; z-index: 1000; text-align: left; line-height: 1.4; }
+    *{box-sizing:border-box;margin:0;padding:0}html,body,#root{height:100%;width:100%}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#0a0f1a 0%,#1a1f2e 50%,#0d1117 100%);color:#e6edf3;-webkit-font-smoothing:antialiased}
+    .loading-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0a0f1a,#1a1f2e,#0d1117);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+    .loading-screen.hidden{display:none}
+    .loading-logo{width:80px;height:80px;background:linear-gradient(135deg,#58a6ff,#1f6feb);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:bold;color:white;margin-bottom:24px;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05);opacity:0.8}}
+    .loading-text{color:#8b949e;font-size:14px}
+    .event-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase}
+    .badge-dividend{background:rgba(46,160,67,0.2);color:#3fb950}
+    .badge-split{background:rgba(88,166,255,0.2);color:#58a6ff}
+    .badge-earnings{background:rgba(187,128,9,0.2);color:#d29922}
+    .badge-insider{background:rgba(163,113,247,0.2);color:#a371f7}
+    .badge-filing{background:rgba(139,148,158,0.2);color:#8b949e}
+    .badge-upgrade{background:rgba(46,160,67,0.2);color:#3fb950}
+    .badge-downgrade{background:rgba(248,81,73,0.2);color:#f85149}
+    .badge-news{background:rgba(56,139,253,0.2);color:#388bfd}
+    .badge-press{background:rgba(163,113,247,0.2);color:#a371f7}
+    .badge-price-target{background:rgba(46,160,67,0.2);color:#3fb950}
+    .collapsible-header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(48,54,61,0.3);border:1px solid rgba(48,54,61,0.5);border-radius:8px;cursor:pointer;transition:all 0.2s}
+    .collapsible-header:hover{background:rgba(48,54,61,0.5)}
+    .collapsible-content{overflow:hidden;transition:max-height 0.3s ease-out}
+    .collapsible-content.collapsed{max-height:0}
+    .collapsible-content.expanded{max-height:1000px}
+    .chevron{transition:transform 0.3s}
+    .chevron.rotated{transform:rotate(180deg)}
   </style>
 </head>
 <body>
@@ -31,513 +44,339 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script>
-    if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('sw.js').catch(function(e) { console.log('SW failed:', e); }); }); }
-    var e = React.createElement, useState = React.useState, useEffect = React.useEffect, useMemo = React.useMemo;
-    function formatCurrency(v) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v); }
-    function formatPercent(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
-    function formatDate(d) { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(e){console.log('SW failed:',e)})});}
+var e=React.createElement,useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo;
+function fmtC(v,c){var curr=c||'USD';try{return new Intl.NumberFormat('en-US',{style:'currency',currency:curr}).format(v)}catch(e){return curr+' '+v.toFixed(2)}}
+function fmtP(v){return(v>=0?'+':'')+v.toFixed(2)+'%'}
+function fmtD(d){if(!d)return'N/A';return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+function fmtN(v){if(!v)return'0';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(1)+'K';return v.toString()}
 
-    function DividendChart(props) {
-      var data = props.data;
-      if (!data || !data.length) return null;
-      var maxVal = Math.max.apply(null, data.map(function(d) { return d.total; }));
-      var recent = data.slice(-10);
-      return e('div', { style: { marginTop: '16px' } },
-        e('div', { style: { fontSize: '12px', color: '#8b949e', marginBottom: '12px' } }, 'Annual Dividend History (Selected Period)'),
-        e('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '4px', height: '80px' } },
-          recent.map(function(item, i) {
-            var h = maxVal > 0 ? (item.total / maxVal) * 100 : 0;
-            var grow = i > 0 && item.total > recent[i-1].total;
-            var dec = i > 0 && item.total < recent[i-1].total;
-            return e('div', { key: item.year, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
-              e('div', { style: { width: '100%', height: h + '%', minHeight: '4px', background: dec ? '#f85149' : grow ? '#3fb950' : '#58a6ff', borderRadius: '3px 3px 0 0' }, title: item.year + ': ' + formatCurrency(item.total) }),
-              e('div', { style: { fontSize: '9px', color: '#8b949e', marginTop: '4px' } }, "'" + String(item.year).slice(-2))
-            );
-          })
-        )
-      );
-    }
+function DivChart(p){var d=p.data;if(!d||!d.length)return null;var mx=Math.max.apply(null,d.map(function(x){return x.total}));var rc=d.slice(-10);return e('div',{style:{marginTop:'16px'}},e('div',{style:{fontSize:'12px',color:'#8b949e',marginBottom:'12px'}},'Annual Dividend per Share'),e('div',{style:{display:'flex',alignItems:'flex-end',gap:'4px',height:'80px'}},rc.map(function(it,i){var h=mx>0?(it.total/mx)*100:0;var gr=i>0&&it.total>rc[i-1].total;var dc=i>0&&it.total<rc[i-1].total;return e('div',{key:it.year,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center'}},e('div',{style:{width:'100%',height:h+'%',minHeight:'4px',background:dc?'#f85149':gr?'#3fb950':'#58a6ff',borderRadius:'3px 3px 0 0'},title:it.year+': '+it.total.toFixed(4)}),e('div',{style:{fontSize:'9px',color:'#8b949e',marginTop:'4px'}},"'"+String(it.year).slice(-2)))})))}
 
-    function App() {
-      var _ticker = useState(''), ticker = _ticker[0], setTicker = _ticker[1];
-      var _searched = useState(''), searchedTicker = _searched[0], setSearchedTicker = _searched[1];
-      var _amount = useState(10000), investmentAmount = _amount[0], setInvestmentAmount = _amount[1];
-      var _startDate = useState('2020-01-01'), investmentDate = _startDate[0], setInvestmentDate = _startDate[1];
-      var _endDate = useState(new Date().toISOString().split('T')[0]), endDate = _endDate[0], setEndDate = _endDate[1];
-      var _loading = useState(false), loading = _loading[0], setLoading = _loading[1];
-      var _error = useState(null), error = _error[0], setError = _error[1];
-      var _apiKey = useState(localStorage.getItem('polygonApiKey') || ''), apiKey = _apiKey[0], setApiKey = _apiKey[1];
-      var _showSetup = useState(true), showSetup = _showSetup[0], setShowSetup = _showSetup[1];
-      var _dividends = useState([]), dividends = _dividends[0], setDividends = _dividends[1];
-      var _splits = useState([]), splits = _splits[0], setSplits = _splits[1];
-      var _priceData = useState(null), priceData = _priceData[0], setPriceData = _priceData[1];
-      var _details = useState(null), tickerDetails = _details[0], setTickerDetails = _details[1];
-      var _returns = useState(null), returnCalc = _returns[0], setReturnCalc = _returns[1];
-      var _tab = useState('dividends'), activeTab = _tab[0], setActiveTab = _tab[1];
-      var _price = useState(null), currentPrice = _price[0], setCurrentPrice = _price[1];
-      var _reinvest = useState(false), reinvestDividends = _reinvest[0], setReinvestDividends = _reinvest[1];
-      var _recent = useState(function() { try { return JSON.parse(localStorage.getItem('recentSearches') || '[]'); } catch(e) { return []; } }), recentSearches = _recent[0], setRecentSearches = _recent[1];
+function App(){
+var _t=useState(''),ticker=_t[0],setTicker=_t[1];
+var _st=useState(''),searchedTicker=_st[0],setSearchedTicker=_st[1];
+var _am=useState(10000),investmentAmount=_am[0],setInvestmentAmount=_am[1];
+var _sd=useState('2020-01-01'),investmentDate=_sd[0],setInvestmentDate=_sd[1];
+var _ed=useState(new Date().toISOString().split('T')[0]),endDate=_ed[0],setEndDate=_ed[1];
+var _ld=useState(false),loading=_ld[0],setLoading=_ld[1];
+var _er=useState(null),error=_er[0],setError=_er[1];
+// API Keys
+var _mk=useState(localStorage.getItem('massiveApiKey')||''),massiveKey=_mk[0],setMassiveKey=_mk[1];
+var _fk=useState(localStorage.getItem('finnhubApiKey')||''),finnhubKey=_fk[0],setFinnhubKey=_fk[1];
+var _fmpk=useState(localStorage.getItem('fmpApiKey')||''),fmpKey=_fmpk[0],setFmpKey=_fmpk[1];
+var _avk=useState(localStorage.getItem('alphaVantageApiKey')||''),alphaVantageKey=_avk[0],setAlphaVantageKey=_avk[1];
+var _ss=useState(true),showSetup=_ss[0],setShowSetup=_ss[1];
+var _keysOpen=useState(false),keysExpanded=_keysOpen[0],setKeysExpanded=_keysOpen[1];
+// Data states
+var _dv=useState([]),dividends=_dv[0],setDividends=_dv[1];
+var _sp=useState([]),splits=_sp[0],setSplits=_sp[1];
+var _earn=useState([]),earnings=_earn[0],setEarnings=_earn[1];
+var _ins=useState([]),insiders=_ins[0],setInsiders=_ins[1];
+var _fil=useState([]),filings=_fil[0],setFilings=_fil[1];
+var _rec=useState([]),recommendations=_rec[0],setRecommendations=_rec[1];
+var _news=useState([]),news=_news[0],setNews=_news[1];
+var _press=useState([]),pressReleases=_press[0],setPressReleases=_press[1];
+var _pt=useState([]),priceTargets=_pt[0],setPriceTargets=_pt[1];
+var _upgrades=useState([]),upgrades=_upgrades[0],setUpgrades=_upgrades[1];
+var _secFil=useState([]),secFilings=_secFil[0],setSecFilings=_secFil[1];
+var _pd=useState(null),priceData=_pd[0],setPriceData=_pd[1];
+var _dt=useState(null),tickerDetails=_dt[0],setTickerDetails=_dt[1];
+var _rt=useState(null),returnCalc=_rt[0],setReturnCalc=_rt[1];
+var _tb=useState('all'),activeTab=_tb[0],setActiveTab=_tb[1];
+var _cp=useState(null),currentPrice=_cp[0],setCurrentPrice=_cp[1];
+var _ri=useState(false),reinvestDividends=_ri[0],setReinvestDividends=_ri[1];
+var _rc=useState(function(){try{return JSON.parse(localStorage.getItem('recentSearches')||'[]')}catch(e){return[]}}),recentSearches=_rc[0],setRecentSearches=_rc[1];
+var _prog=useState(''),progress=_prog[0],setProgress=_prog[1];
+var _cik=useState(null),companyCik=_cik[0],setCompanyCik=_cik[1];
 
-      useEffect(function() { if (apiKey) localStorage.setItem('polygonApiKey', apiKey); }, [apiKey]);
-      useEffect(function() { document.getElementById('loading').classList.add('hidden'); }, []);
+// Load config.json on startup
+useEffect(function(){
+fetch('config.json').then(function(r){return r.json()}).then(function(cfg){
+if(cfg.apis){
+if(cfg.apis.massive&&cfg.apis.massive.key&&!massiveKey){setMassiveKey(cfg.apis.massive.key);localStorage.setItem('massiveApiKey',cfg.apis.massive.key)}
+if(cfg.apis.finnhub&&cfg.apis.finnhub.key&&!finnhubKey){setFinnhubKey(cfg.apis.finnhub.key);localStorage.setItem('finnhubApiKey',cfg.apis.finnhub.key)}
+if(cfg.apis.fmp&&cfg.apis.fmp.key&&!fmpKey){setFmpKey(cfg.apis.fmp.key);localStorage.setItem('fmpApiKey',cfg.apis.fmp.key)}
+if(cfg.apis.alphaVantage&&cfg.apis.alphaVantage.key&&!alphaVantageKey){setAlphaVantageKey(cfg.apis.alphaVantage.key);localStorage.setItem('alphaVantageApiKey',cfg.apis.alphaVantage.key)}
+}
+if(cfg.settings){
+if(cfg.settings.defaultInvestmentAmount)setInvestmentAmount(cfg.settings.defaultInvestmentAmount);
+if(cfg.settings.defaultStartDate)setInvestmentDate(cfg.settings.defaultStartDate);
+}
+}).catch(function(){});
+},[]);
 
-      function addRecent(t) {
-        var updated = [t].concat(recentSearches.filter(function(s) { return s !== t; })).slice(0, 5);
-        setRecentSearches(updated);
-        localStorage.setItem('recentSearches', JSON.stringify(updated));
-      }
+useEffect(function(){if(massiveKey)localStorage.setItem('massiveApiKey',massiveKey);if(finnhubKey)localStorage.setItem('finnhubApiKey',finnhubKey);if(fmpKey)localStorage.setItem('fmpApiKey',fmpKey);if(alphaVantageKey)localStorage.setItem('alphaVantageApiKey',alphaVantageKey)},[massiveKey,finnhubKey,fmpKey,alphaVantageKey]);
+useEffect(function(){document.getElementById('loading').classList.add('hidden')},[]);
 
-      // Filter dividends to selected date range
-      function getFilteredDividends(divs) {
-        var start = new Date(investmentDate);
-        var end = new Date(endDate);
-        return divs.filter(function(d) {
-          var exDate = new Date(d.ex_dividend_date);
-          return exDate >= start && exDate <= end;
-        });
-      }
+function addRecent(t){var u=[t].concat(recentSearches.filter(function(s){return s!==t})).slice(0,8);setRecentSearches(u);localStorage.setItem('recentSearches',JSON.stringify(u))}
 
-      function calcReturns(prices, divs, splts, reinvest) {
-        if (!prices || prices.length < 2) return;
-        var startP = prices[0].c, endP = prices[prices.length - 1].c;
-        var startD = new Date(prices[0].t), endD = new Date(prices[prices.length - 1].t);
-        var shares = investmentAmount / startP;
-        
-        // Apply splits
-        var adjShares = shares;
-        splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; })
-          .forEach(function(s) { adjShares = adjShares * (s.split_to / s.split_from); });
-        
-        // Filter dividends to date range
-        var relDivs = divs.filter(function(d) { 
-          var exDate = new Date(d.ex_dividend_date);
-          return exDate >= startD && exDate <= endD; 
-        });
-        
-        var divIncome = 0;
-        var reinvestedShares = adjShares;
-        
-        if (reinvest) {
-          // DRIP: reinvest dividends at approximate price
-          relDivs.forEach(function(d) {
-            var divAmount = d.cash_amount * reinvestedShares;
-            // Find approximate price at dividend date
-            var divDate = new Date(d.pay_date || d.ex_dividend_date).getTime();
-            var priceAtDiv = endP; // default to end price
-            for (var i = 0; i < prices.length; i++) {
-              if (prices[i].t >= divDate) {
-                priceAtDiv = prices[i].c;
-                break;
-              }
-            }
-            var newShares = divAmount / priceAtDiv;
-            reinvestedShares += newShares;
-            divIncome += divAmount;
-          });
-          var endVal = reinvestedShares * endP;
-          var total = endVal;
-        } else {
-          // Cash dividends
-          relDivs.forEach(function(d) { divIncome += d.cash_amount * adjShares; });
-          var endVal = adjShares * endP;
-          var total = endVal + divIncome;
-          reinvestedShares = adjShares;
-        }
-        
-        var pctRet = ((total - investmentAmount) / investmentAmount) * 100;
-        var yrs = (endD - startD) / (365.25 * 24 * 60 * 60 * 1000);
-        var annRet = yrs > 0 ? (Math.pow(total / investmentAmount, 1/yrs) - 1) * 100 : 0;
-        
-        setReturnCalc({ 
-          startPrice: startP, endPrice: endP, sharesPurchased: shares, adjustedShares: adjShares,
-          finalShares: reinvestedShares, totalDividendIncome: divIncome, endingShareValue: reinvest ? total : endVal, 
-          totalReturn: total, percentReturn: pctRet, annualizedReturn: annRet, years: yrs, 
-          priceReturn: ((endP - startP) / startP) * 100,
-          dividendCount: relDivs.length, 
-          splitCount: splts.filter(function(s) { var d = new Date(s.execution_date); return d >= startD && d <= endD; }).length,
-          reinvested: reinvest
-        });
-      }
+function calcReturns(prices,divs,splts,reinv){
+if(!prices||prices.length<2)return;
+var stP=prices[0].c,enP=prices[prices.length-1].c;
+var stD=new Date(prices[0].t),enD=new Date(prices[prices.length-1].t);
+var shares=investmentAmount/stP,adjShares=shares;
+splts.filter(function(s){var d=new Date(s.date);return d>=stD&&d<=enD}).forEach(function(s){var r=(s.split_to||1)/(s.split_from||1);if(r)adjShares=adjShares*r});
+var relDivs=divs.filter(function(d){var ex=new Date(d.date);return ex>=stD&&ex<=enD});
+var divInc=0,reinvShares=adjShares;
+if(reinv){relDivs.forEach(function(d){var amt=(d.amount||0)*reinvShares;var dDate=new Date(d.payDate||d.date).getTime();var pAtDiv=enP;for(var i=0;i<prices.length;i++){if(prices[i].t>=dDate){pAtDiv=prices[i].c;break}}reinvShares+=amt/pAtDiv;divInc+=amt});var total=reinvShares*enP}
+else{relDivs.forEach(function(d){divInc+=(d.amount||0)*adjShares});var total=adjShares*enP+divInc;reinvShares=adjShares}
+var pctRet=((total-investmentAmount)/investmentAmount)*100;
+var yrs=(enD-stD)/(365.25*24*60*60*1000);
+var annRet=yrs>0?(Math.pow(total/investmentAmount,1/yrs)-1)*100:0;
+setReturnCalc({startPrice:stP,endPrice:enP,sharesPurchased:shares,adjustedShares:adjShares,finalShares:reinvShares,totalDividendIncome:divInc,totalReturn:total,percentReturn:pctRet,annualizedReturn:annRet,years:yrs,dividendCount:relDivs.length,reinvested:reinv})}
 
-      function fetchData() {
-        if (!ticker || !apiKey) return;
-        setLoading(true); setError(null);
-        var t = ticker.toUpperCase();
-        setSearchedTicker(t); addRecent(t);
-        Promise.all([
-          fetch('https://api.polygon.io/v3/reference/dividends?ticker=' + t + '&limit=1000&apiKey=' + apiKey),
-          fetch('https://api.polygon.io/v3/reference/splits?ticker=' + t + '&limit=1000&apiKey=' + apiKey),
-          fetch('https://api.polygon.io/v3/reference/tickers/' + t + '?apiKey=' + apiKey),
-          fetch('https://api.polygon.io/v2/aggs/ticker/' + t + '/range/1/day/' + investmentDate + '/' + endDate + '?adjusted=true&sort=asc&limit=50000&apiKey=' + apiKey),
-          fetch('https://api.polygon.io/v2/aggs/ticker/' + t + '/prev?adjusted=true&apiKey=' + apiKey)
-        ]).then(function(res) { return Promise.all(res.map(function(r) { return r.json(); })); })
-        .then(function(data) {
-          var divD = data[0], splitD = data[1], detD = data[2], priceD = data[3], prevD = data[4];
-          var allDivs = divD.status === 'OK' ? (divD.results || []) : [];
-          var allSplits = splitD.status === 'OK' ? (splitD.results || []) : [];
-          setDividends(allDivs);
-          setSplits(allSplits);
-          if (detD.status === 'OK') setTickerDetails(detD.results);
-          if (prevD.status === 'OK' && prevD.results && prevD.results[0]) setCurrentPrice(prevD.results[0].c);
-          if (priceD.status === 'OK' && priceD.results && priceD.results.length > 0) {
-            setPriceData(priceD.results);
-            calcReturns(priceD.results, allDivs, allSplits, reinvestDividends);
-          }
-          setShowSetup(false); setLoading(false);
-        }).catch(function(err) { setError(err.message || 'Failed to fetch'); setLoading(false); });
-      }
+function fetchData(){
+if(!ticker){setError('Please enter a ticker');return}
+setLoading(true);setError(null);setProgress('Starting...');
+var t=ticker.toUpperCase();setSearchedTicker(t);addRecent(t);
+var promises=[];
+var results={dividends:[],splits:[],earnings:[],insiders:[],filings:[],recommendations:[],news:[],pressReleases:[],priceTargets:[],upgrades:[],secFilings:[],prices:[],details:null,currentPrice:null,cik:null};
 
-      useEffect(function() { 
-        if (priceData && dividends && splits) calcReturns(priceData, dividends, splits, reinvestDividends); 
-      }, [investmentAmount, reinvestDividends]);
+// MASSIVE API
+if(massiveKey){
+setProgress('Fetching from Massive...');
+promises.push(
+fetch('https://api.polygon.io/v3/reference/dividends?ticker='+t+'&limit=1000&apiKey='+massiveKey).then(function(r){return r.json()}).then(function(d){if(d.status==='OK'&&d.results){results.dividends=d.results.map(function(x){return{type:'dividend',date:x.ex_dividend_date,payDate:x.pay_date,amount:x.cash_amount,divType:x.dividend_type,source:'Massive'}})}}).catch(function(){}),
+fetch('https://api.polygon.io/v3/reference/splits?ticker='+t+'&limit=1000&apiKey='+massiveKey).then(function(r){return r.json()}).then(function(d){if(d.status==='OK'&&d.results){results.splits=d.results.map(function(x){return{type:'split',date:x.execution_date,split_to:x.split_to,split_from:x.split_from,source:'Massive'}})}}).catch(function(){}),
+fetch('https://api.polygon.io/v3/reference/tickers/'+t+'?apiKey='+massiveKey).then(function(r){return r.json()}).then(function(d){if(d.status==='OK'&&d.results){results.details={name:d.results.name};if(d.results.cik)results.cik=d.results.cik}}).catch(function(){}),
+fetch('https://api.polygon.io/v2/aggs/ticker/'+t+'/range/1/day/'+investmentDate+'/'+endDate+'?adjusted=true&sort=asc&limit=50000&apiKey='+massiveKey).then(function(r){return r.json()}).then(function(d){if(d.status==='OK'&&d.results){results.prices=d.results.map(function(x){return{t:x.t,c:x.c}})}}).catch(function(){}),
+fetch('https://api.polygon.io/v2/aggs/ticker/'+t+'/prev?adjusted=true&apiKey='+massiveKey).then(function(r){return r.json()}).then(function(d){if(d.status==='OK'&&d.results&&d.results[0]){results.currentPrice=d.results[0].c}}).catch(function(){})
+)}
 
-      // Get filtered dividends for display and analysis
-      var filteredDividends = useMemo(function() {
-        return getFilteredDividends(dividends);
-      }, [dividends, investmentDate, endDate]);
+// FINNHUB API  
+if(finnhubKey){
+setProgress('Fetching from Finnhub...');
+var fromTs=Math.floor(new Date(investmentDate).getTime()/1000);
+var toTs=Math.floor(new Date(endDate).getTime()/1000);
+promises.push(
+fetch('https://finnhub.io/api/v1/calendar/earnings?symbol='+t+'&from='+investmentDate+'&to='+endDate+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d.earningsCalendar){results.earnings=d.earningsCalendar.map(function(x){return{type:'earnings',date:x.date,epsActual:x.epsActual,epsEstimate:x.epsEstimate,revenueActual:x.revenueActual,source:'Finnhub'}})}}).catch(function(){}),
+fetch('https://finnhub.io/api/v1/stock/insider-transactions?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d.data){results.insiders=d.data.slice(0,50).map(function(x){return{type:'insider',date:x.transactionDate,name:x.name,change:x.change,transactionPrice:x.transactionPrice,source:'Finnhub'}})}}).catch(function(){}),
+fetch('https://finnhub.io/api/v1/stock/filings?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)){results.filings=d.slice(0,30).map(function(x){return{type:'filing',date:x.filedDate||x.acceptedDate,form:x.form,url:x.reportUrl,source:'Finnhub'}})}}).catch(function(){}),
+fetch('https://finnhub.io/api/v1/stock/recommendation?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)){results.recommendations=d.slice(0,20).map(function(x){return{type:'recommendation',date:x.period,strongBuy:x.strongBuy,buy:x.buy,hold:x.hold,sell:x.sell,strongSell:x.strongSell,source:'Finnhub'}})}}).catch(function(){}),
+fetch('https://finnhub.io/api/v1/quote?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d&&d.c&&!results.currentPrice){results.currentPrice=d.c}}).catch(function(){}),
+fetch('https://finnhub.io/api/v1/stock/profile2?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d&&d.name&&!results.details){results.details={name:d.name,exchange:d.exchange}}}).catch(function(){}),
+fetch('https://finnhub.io/api/v1/stock/candle?symbol='+t+'&resolution=D&from='+fromTs+'&to='+toTs+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d&&d.s==='ok'&&d.c&&results.prices.length===0){for(var i=0;i<d.c.length;i++){results.prices.push({c:d.c[i],t:d.t[i]*1000})}}}).catch(function(){})
+)}
 
-      var filteredSplits = useMemo(function() {
-        var start = new Date(investmentDate);
-        var end = new Date(endDate);
-        return splits.filter(function(s) {
-          var d = new Date(s.execution_date);
-          return d >= start && d <= end;
-        });
-      }, [splits, investmentDate, endDate]);
+// FMP API
+if(fmpKey){
+setProgress('Fetching from FMP...');
+promises.push(
+fetch('https://financialmodelingprep.com/api/v3/stock_news?tickers='+t+'&limit=20&apikey='+fmpKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)){results.news=d.map(function(x){return{type:'news',date:x.publishedDate?x.publishedDate.split('T')[0]:null,title:x.title,url:x.url,source:'FMP'}})}}).catch(function(){}),
+fetch('https://financialmodelingprep.com/api/v3/press-releases/'+t+'?limit=15&apikey='+fmpKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)){results.pressReleases=d.map(function(x){return{type:'press',date:x.date,title:x.title,source:'FMP'}})}}).catch(function(){}),
+fetch('https://financialmodelingprep.com/api/v4/price-target?symbol='+t+'&apikey='+fmpKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)){results.priceTargets=d.slice(0,20).map(function(x){return{type:'priceTarget',date:x.publishedDate?x.publishedDate.split('T')[0]:null,analyst:x.analystName,company:x.analystCompany,priceTarget:x.priceTarget,priceWhenPosted:x.priceWhenPosted,source:'FMP'}})}}).catch(function(){}),
+fetch('https://financialmodelingprep.com/api/v4/upgrades-downgrades?symbol='+t+'&apikey='+fmpKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)){results.upgrades=d.slice(0,20).map(function(x){return{type:'upgrade',date:x.publishedDate?x.publishedDate.split('T')[0]:null,company:x.gradingCompany,action:x.action,fromGrade:x.previousGrade,toGrade:x.newGrade,source:'FMP'}})}}).catch(function(){}),
+fetch('https://financialmodelingprep.com/api/v3/profile/'+t+'?apikey='+fmpKey).then(function(r){return r.json()}).then(function(d){if(Array.isArray(d)&&d[0]&&!results.details){results.details={name:d[0].companyName,exchange:d[0].exchangeShortName}}if(Array.isArray(d)&&d[0]&&!results.currentPrice){results.currentPrice=d[0].price}}).catch(function(){})
+)}
 
-      var divAnalysis = useMemo(function() {
-        if (!filteredDividends.length || !currentPrice) return null;
-        
-        // Calculate annual dividend within period
-        var start = new Date(investmentDate);
-        var end = new Date(endDate);
-        var periodYears = (end - start) / (365.25 * 24 * 60 * 60 * 1000);
-        
-        var totalDiv = 0;
-        filteredDividends.forEach(function(d) { totalDiv += d.cash_amount; });
-        var annualizedDiv = periodYears > 0 ? totalDiv / periodYears : totalDiv;
-        var yld = currentPrice > 0 ? (annualizedDiv / currentPrice) * 100 : 0;
-        
-        // Group by year within period
-        var byYear = {};
-        filteredDividends.forEach(function(d) { 
-          var y = new Date(d.ex_dividend_date).getFullYear(); 
-          byYear[y] = (byYear[y] || 0) + d.cash_amount; 
-        });
-        var yrs = Object.keys(byYear).sort();
-        var yearly = yrs.map(function(y) { return { year: parseInt(y), total: byYear[y] }; });
-        
-        // CAGR within period
-        function cagr(n) { 
-          if (yearly.length < n + 1) return null; 
-          var r = yearly.slice(-n - 1); 
-          if (r.length < 2 || r[0].total <= 0 || r[r.length-1].total <= 0) return null; 
-          return (Math.pow(r[r.length-1].total / r[0].total, 1/n) - 1) * 100; 
-        }
-        
-        // Consecutive years with dividends in period
-        var consec = yearly.length;
-        
-        // Frequency detection
-        var freqMap = {};
-        filteredDividends.forEach(function(d) { var f = d.frequency || 0; freqMap[f] = (freqMap[f] || 0) + 1; });
-        var freqLabels = { '0': 'One-time', '1': 'Annual', '2': 'Semi-Annual', '4': 'Quarterly', '12': 'Monthly' };
-        var topFreq = Object.entries(freqMap).sort(function(a, b) { return b[1] - a[1]; })[0];
-        
-        return { 
-          currentYield: yld, 
-          annualizedDividend: annualizedDiv,
-          totalDividendInPeriod: totalDiv,
-          yearlyData: yearly, 
-          cagr3Year: cagr(3), 
-          cagr5Year: cagr(5),
-          periodYears: periodYears,
-          frequency: freqLabels[topFreq ? topFreq[0] : '0'] || 'Variable', 
-          consecutiveYears: consec, 
-          latestDividend: filteredDividends[0] ? filteredDividends[0].cash_amount : 0,
-          dividendCount: filteredDividends.length
-        };
-      }, [filteredDividends, currentPrice, investmentDate, endDate]);
+// ALPHA VANTAGE API
+if(alphaVantageKey){
+setProgress('Fetching from Alpha Vantage...');
+promises.push(
+fetch('https://www.alphavantage.co/query?function=OVERVIEW&symbol='+t+'&apikey='+alphaVantageKey).then(function(r){return r.json()}).then(function(d){if(d&&d.Name&&!results.details){results.details={name:d.Name,sector:d.Sector,industry:d.Industry}}}).catch(function(){})
+)}
 
-      var stats = useMemo(function() {
-        var now = new Date();
-        var start = new Date(investmentDate);
-        var end = new Date(endDate);
-        return { 
-          totalDividends: filteredDividends.length, 
-          totalSplits: filteredSplits.length,
-          upcomingDividends: dividends.filter(function(d) { return new Date(d.ex_dividend_date) > now; }),
-          upcomingSplits: splits.filter(function(s) { return new Date(s.execution_date) > now; }) 
-        };
-      }, [filteredDividends, filteredSplits, dividends, splits]);
+// SEC EDGAR API (FREE)
+setProgress('Fetching from SEC EDGAR...');
+promises.push(
+fetch('https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK='+t+'&type=&dateb=&owner=include&count=1&output=atom',{headers:{'User-Agent':'CorporateActionsTracker/1.0'}})
+.then(function(r){return r.text()}).then(function(xml){
+var cikMatch=xml.match(/CIK=(\d+)/);
+if(cikMatch){
+var cik=cikMatch[1].padStart(10,'0');
+results.cik=cik;
+return fetch('https://data.sec.gov/submissions/CIK'+cik+'.json',{headers:{'User-Agent':'CorporateActionsTracker/1.0'}});
+}
+return null;
+}).then(function(r){return r?r.json():null}).then(function(d){
+if(d&&d.filings&&d.filings.recent){
+var recent=d.filings.recent;
+var secFils=[];
+for(var i=0;i<Math.min(recent.form.length,50);i++){
+var form=recent.form[i];
+if(['10-K','10-Q','8-K','DEF 14A','S-1','4','SC 13G','SC 13D','13F-HR'].indexOf(form)>=0){
+secFils.push({type:'secFiling',date:recent.filingDate[i],form:form,description:recent.primaryDocDescription?recent.primaryDocDescription[i]:'',source:'SEC EDGAR'});
+}}
+results.secFilings=secFils;
+if(d.name&&!results.details){results.details={name:d.name}}
+}}).catch(function(err){console.log('SEC:',err)})
+);
 
-      var s = {
-        container: { minHeight: '100vh', background: 'linear-gradient(135deg, #0a0f1a 0%, #1a1f2e 50%, #0d1117 100%)', paddingBottom: '20px' },
-        header: { background: 'rgba(13,17,23,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(48,54,61,0.6)', padding: '16px', position: 'sticky', top: 0, zIndex: 100 },
-        card: { background: 'rgba(13,17,23,0.6)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '12px', padding: '16px', marginBottom: '12px' },
-        input: { width: '100%', padding: '14px 16px', background: 'rgba(13,17,23,0.6)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '10px', color: '#e6edf3', fontSize: '16px', outline: 'none', boxSizing: 'border-box' },
-        btn: { width: '100%', padding: '16px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: '600', cursor: 'pointer' },
-        label: { display: 'block', marginBottom: '8px', fontSize: '13px', color: '#8b949e', fontWeight: '500' },
-        metric: { fontSize: '11px', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' },
-        link: { color: '#58a6ff', textDecoration: 'none', fontSize: '12px' }
-      };
+setProgress('Processing...');
+Promise.all(promises).then(function(){
+setDividends(results.dividends);setSplits(results.splits);setEarnings(results.earnings);setInsiders(results.insiders);setFilings(results.filings);setRecommendations(results.recommendations);setNews(results.news);setPressReleases(results.pressReleases);setPriceTargets(results.priceTargets);setUpgrades(results.upgrades);setSecFilings(results.secFilings);setTickerDetails(results.details||{name:t});setCurrentPrice(results.currentPrice);setCompanyCik(results.cik);
+if(results.prices.length>0){setPriceData(results.prices);calcReturns(results.prices,results.dividends,results.splits,reinvestDividends)}else{setPriceData(null);setReturnCalc(null)}
+setShowSetup(false);setLoading(false);setProgress('');
+}).catch(function(err){setError(err.message||'Failed');setLoading(false);setProgress('')})}
 
-      // Setup/Search screen - always show this layout for new searches
-      if (showSetup) {
-        return e('div', { style: s.container },
-          e('header', { style: s.header },
-            e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
-              e('div', { style: { width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', color: 'white' } }, 'CA'),
-              e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, 'Corporate Actions Tracker')
-            )
-          ),
-          e('main', { style: { padding: '16px' } },
-            e('div', { style: s.card },
-              e('h2', { style: { margin: '0 0 8px', fontSize: '18px', fontWeight: '600' } }, searchedTicker ? 'New Search' : 'Get Started'),
-              e('p', { style: { margin: '0 0 20px', color: '#8b949e', fontSize: '14px' } }, 'Enter your Massive (Polygon.io) API key and a stock ticker.'),
-              
-              e('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
-                e('div', null,
-                  e('label', { style: s.label }, 'API Key'),
-                  e('input', { type: 'password', value: apiKey, onChange: function(ev) { setApiKey(ev.target.value); }, placeholder: 'Your Massive/Polygon.io API key', style: s.input }),
-                  e('a', { href: 'https://massive.com', target: '_blank', style: { fontSize: '12px', color: '#58a6ff', display: 'block', marginTop: '6px' } }, 'Get free API key at massive.com →')
-                ),
-                e('div', null,
-                  e('label', { style: s.label }, 'Stock Ticker'),
-                  e('input', { type: 'text', value: ticker, onChange: function(ev) { setTicker(ev.target.value.toUpperCase()); }, placeholder: 'e.g. AAPL, MSFT, JNJ', style: s.input }),
-                  recentSearches.length > 0 && e('div', { style: { display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' } },
-                    recentSearches.map(function(t) { return e('button', { key: t, onClick: function() { setTicker(t); }, style: { padding: '6px 12px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)', borderRadius: '6px', color: '#58a6ff', fontSize: '12px', cursor: 'pointer' } }, t); })
-                  )
-                ),
-                e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } },
-                  e('div', null, e('label', { style: s.label }, 'Start Date'), e('input', { type: 'date', value: investmentDate, onChange: function(ev) { setInvestmentDate(ev.target.value); }, style: s.input })),
-                  e('div', null, e('label', { style: s.label }, 'End Date'), e('input', { type: 'date', value: endDate, onChange: function(ev) { setEndDate(ev.target.value); }, style: s.input }))
-                ),
-                e('div', null, 
-                  e('label', { style: s.label }, 'Investment Amount ($)'), 
-                  e('input', { type: 'number', value: investmentAmount, onChange: function(ev) { setInvestmentAmount(parseFloat(ev.target.value) || 0); }, style: s.input })
-                ),
-                e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(48,54,61,0.3)', borderRadius: '8px' } },
-                  e('input', { type: 'checkbox', id: 'reinvest', checked: reinvestDividends, onChange: function(ev) { setReinvestDividends(ev.target.checked); }, style: { width: '20px', height: '20px' } }),
-                  e('label', { htmlFor: 'reinvest', style: { fontSize: '14px', cursor: 'pointer' } }, 'Reinvest dividends (DRIP)'),
-                  e('span', { style: { fontSize: '12px', color: '#8b949e', marginLeft: 'auto' } }, reinvestDividends ? 'Dividends buy more shares' : 'Dividends taken as cash')
-                ),
-                e('button', { onClick: fetchData, disabled: loading || !ticker || !apiKey, style: Object.assign({}, s.btn, { opacity: (loading || !ticker || !apiKey) ? 0.6 : 1 }) }, loading ? 'Loading...' : 'Analyse Corporate Actions')
-              )
-            ),
-            error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', color: '#f85149', fontSize: '14px' } }, error),
-            e('div', { style: { marginTop: '20px', padding: '16px', background: 'rgba(48,54,61,0.2)', borderRadius: '12px' } },
-              e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '8px' } }, 'What are Corporate Actions?'),
-              e('p', { style: { fontSize: '13px', color: '#8b949e', marginBottom: '12px', lineHeight: '1.5' } }, 
-                'Corporate actions are events initiated by companies that affect shareholders. Common types include dividends, stock splits, mergers, acquisitions, spin-offs, rights issues, and buybacks.'),
-              e('a', { href: 'https://www.investopedia.com/terms/c/corporateaction.asp', target: '_blank', style: s.link }, 'Learn more about corporate actions →')
-            )
-          )
-        );
-      }
+useEffect(function(){if(priceData&&dividends&&splits)calcReturns(priceData,dividends,splits,reinvestDividends)},[investmentAmount,reinvestDividends]);
 
-      // Results screen
-      return e('div', { style: s.container },
-        e('header', { style: s.header },
-          e('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-            e('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
-              e('div', { style: { width: '36px', height: '36px', background: 'linear-gradient(135deg, #58a6ff 0%, #1f6feb 100%)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 'bold', color: 'white' } }, 'CA'),
-              e('div', null, e('h1', { style: { margin: 0, fontSize: '18px', fontWeight: '600' } }, searchedTicker), tickerDetails && e('p', { style: { margin: 0, fontSize: '11px', color: '#8b949e' } }, tickerDetails.name))
-            ),
-            e('button', { onClick: function() { setShowSetup(true); }, style: { padding: '8px 16px', background: 'linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' } }, 'New Search')
-          )
-        ),
-        e('main', { style: { padding: '16px' } },
-          error && e('div', { style: { background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.4)', borderRadius: '12px', padding: '14px', marginBottom: '12px', color: '#f85149', fontSize: '14px' } }, error),
-          
-          // Period info
-          e('div', { style: { fontSize: '12px', color: '#8b949e', marginBottom: '12px', textAlign: 'center' } }, 
-            'Analysis period: ' + formatDate(investmentDate) + ' to ' + formatDate(endDate)
-          ),
+var allEvents=useMemo(function(){
+var st=new Date(investmentDate),en=new Date(endDate);
+var events=[];
+function inRange(d){if(!d)return false;var dt=new Date(d);return dt>=st&&dt<=en}
+dividends.forEach(function(d){if(inRange(d.date))events.push(d)});
+splits.forEach(function(s){if(inRange(s.date))events.push(s)});
+earnings.forEach(function(e){if(inRange(e.date))events.push(e)});
+insiders.forEach(function(i){if(inRange(i.date))events.push(i)});
+filings.forEach(function(f){if(inRange(f.date))events.push(f)});
+recommendations.forEach(function(r){if(inRange(r.date))events.push(r)});
+news.forEach(function(n){if(inRange(n.date))events.push(n)});
+pressReleases.forEach(function(p){if(inRange(p.date))events.push(p)});
+priceTargets.forEach(function(p){if(inRange(p.date))events.push(p)});
+upgrades.forEach(function(u){if(inRange(u.date))events.push(u)});
+secFilings.forEach(function(s){if(inRange(s.date))events.push(s)});
+events.sort(function(a,b){return new Date(b.date)-new Date(a.date)});
+return events;
+},[dividends,splits,earnings,insiders,filings,recommendations,news,pressReleases,priceTargets,upgrades,secFilings,investmentDate,endDate]);
 
-          // Company info with price
-          tickerDetails && e('div', { style: Object.assign({}, s.card, { display: 'flex', alignItems: 'center', gap: '12px' }) },
-            e('div', { style: { flex: 1 } },
-              e('div', { style: { fontSize: '20px', fontWeight: '700' } }, searchedTicker),
-              e('div', { style: { fontSize: '13px', color: '#8b949e' } }, tickerDetails.name)
-            ),
-            currentPrice && e('div', { style: { textAlign: 'right' } },
-              e('div', { style: { fontSize: '24px', fontWeight: '700' } }, formatCurrency(currentPrice)),
-              divAnalysis && divAnalysis.currentYield > 0 && e('div', { style: { fontSize: '12px', color: '#3fb950' } }, divAnalysis.currentYield.toFixed(2) + '% yield')
-            )
-          ),
+var filteredEvents=useMemo(function(){if(activeTab==='all')return allEvents;return allEvents.filter(function(e){return e.type===activeTab})},[allEvents,activeTab]);
+var periodYears=useMemo(function(){return(new Date(endDate)-new Date(investmentDate))/(365.25*24*60*60*1000)},[investmentDate,endDate]);
 
-          // Key metrics row
-          e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' } },
-            returnCalc && e('div', { style: Object.assign({}, s.card, { marginBottom: 0, background: 'linear-gradient(135deg, rgba(46,160,67,0.15) 0%, rgba(35,134,54,0.1) 100%)', border: '1px solid rgba(46,160,67,0.3)' }) },
-              e('div', { style: s.metric }, 'Total Return'),
-              e('div', { style: { fontSize: '24px', fontWeight: '700', color: returnCalc.percentReturn >= 0 ? '#3fb950' : '#f85149' } }, formatPercent(returnCalc.percentReturn)),
-              e('div', { style: { fontSize: '11px', color: '#8b949e' } }, returnCalc.annualizedReturn.toFixed(1) + '% p.a.')
-            ),
-            divAnalysis && e('div', { style: Object.assign({}, s.card, { marginBottom: 0 }) },
-              e('div', { style: Object.assign({}, s.metric, { display: 'flex', alignItems: 'center', gap: '4px' }) }, 
-                'Div Growth',
-                e('span', { 
-                  className: 'tooltip',
-                  'data-tip': 'Compound Annual Growth Rate of dividends over ' + (divAnalysis.cagr5Year !== null ? '5' : divAnalysis.cagr3Year !== null ? '3' : 'N/A') + ' years within your selected date range. Streak = consecutive years with dividend payments in period.',
-                  style: { cursor: 'help', color: '#58a6ff' }
-                }, 'ⓘ')
-              ),
-              e('div', { style: { fontSize: '24px', fontWeight: '700', color: (divAnalysis.cagr5Year !== null && divAnalysis.cagr5Year >= 0) || (divAnalysis.cagr3Year !== null && divAnalysis.cagr3Year >= 0) ? '#3fb950' : divAnalysis.cagr5Year !== null || divAnalysis.cagr3Year !== null ? '#f85149' : '#8b949e' } }, 
-                divAnalysis.cagr5Year !== null ? formatPercent(divAnalysis.cagr5Year) + ' (5Y)' : divAnalysis.cagr3Year !== null ? formatPercent(divAnalysis.cagr3Year) + ' (3Y)' : 'N/A'
-              ),
-              e('div', { style: { fontSize: '11px', color: '#8b949e' } }, divAnalysis.consecutiveYears + ' yr' + (divAnalysis.consecutiveYears !== 1 ? 's' : '') + ' in period')
-            )
-          ),
+var divAnalysis=useMemo(function(){
+if(!currentPrice)return null;
+var st=new Date(investmentDate),en=new Date(endDate);
+var filteredDivs=dividends.filter(function(d){return new Date(d.date)>=st&&new Date(d.date)<=en});
+var oneYrBefore=new Date(en.getFullYear()-1,en.getMonth(),en.getDate());
+var recentDivs=dividends.filter(function(d){var ex=new Date(d.date);return ex>=oneYrBefore&&ex<=en});
+var ttm=0;recentDivs.forEach(function(d){ttm+=(d.amount||0)});
+var yld=currentPrice>0&&ttm>0?(ttm/currentPrice)*100:0;
+var totalDiv=0;filteredDivs.forEach(function(d){totalDiv+=(d.amount||0)});
+return{currentYield:yld,totalDividendInPeriod:totalDiv,dividendCount:filteredDivs.length}
+},[dividends,currentPrice,investmentDate,endDate]);
 
-          // Investment Results
-          returnCalc && e('div', { style: Object.assign({}, s.card, { background: 'linear-gradient(135deg, rgba(88,166,255,0.1) 0%, rgba(31,111,235,0.05) 100%)', border: '1px solid rgba(88,166,255,0.3)' }) },
-            e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
-              e('div', { style: { fontSize: '14px', fontWeight: '600' } }, 'Investment Result'),
-              e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-                e('span', { style: { fontSize: '12px', color: '#8b949e' } }, returnCalc.reinvested ? 'DRIP' : 'Cash divs'),
-                e('button', { 
-                  onClick: function() { setReinvestDividends(!reinvestDividends); },
-                  style: { padding: '4px 10px', background: 'rgba(48,54,61,0.5)', border: '1px solid rgba(48,54,61,0.8)', borderRadius: '6px', color: '#58a6ff', fontSize: '11px', cursor: 'pointer' }
-                }, 'Toggle')
-              )
-            ),
-            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' } },
-              e('div', { style: { padding: '12px', background: 'rgba(13,17,23,0.4)', borderRadius: '8px' } },
-                e('div', { style: { fontSize: '11px', color: '#8b949e', marginBottom: '4px' } }, 'Initial Investment'),
-                e('div', { style: { fontSize: '20px', fontWeight: '700' } }, formatCurrency(investmentAmount))
-              ),
-              e('div', { style: { padding: '12px', background: 'rgba(46,160,67,0.15)', borderRadius: '8px' } },
-                e('div', { style: { fontSize: '11px', color: '#8b949e', marginBottom: '4px' } }, 'Final Value'),
-                e('div', { style: { fontSize: '20px', fontWeight: '700', color: '#3fb950' } }, formatCurrency(returnCalc.totalReturn))
-              )
-            ),
-            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '12px', fontSize: '12px' } },
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Shares: '), e('strong', null, returnCalc.sharesPurchased.toFixed(2) + ' → ' + returnCalc.finalShares.toFixed(2))),
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Dividends: '), e('strong', { style: { color: '#3fb950' } }, formatCurrency(returnCalc.totalDividendIncome))),
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Period: '), e('strong', null, returnCalc.years.toFixed(1) + ' yrs'))
-            ),
-            returnCalc.reinvested && e('div', { style: { marginTop: '12px', padding: '8px 12px', background: 'rgba(46,160,67,0.1)', borderRadius: '6px', fontSize: '12px', color: '#8b949e' } },
-              'With DRIP, ' + formatCurrency(returnCalc.totalDividendIncome) + ' in dividends purchased ' + (returnCalc.finalShares - returnCalc.adjustedShares).toFixed(2) + ' additional shares'
-            )
-          ),
+var eventCounts=useMemo(function(){
+var counts={all:allEvents.length,dividend:0,split:0,earnings:0,insider:0,filing:0,recommendation:0,news:0,press:0,priceTarget:0,upgrade:0,secFiling:0};
+allEvents.forEach(function(e){if(counts[e.type]!==undefined)counts[e.type]++});
+return counts;
+},[allEvents]);
 
-          // Dividend Analysis (only show if there are dividends in period)
-          divAnalysis && divAnalysis.dividendCount > 0 && e('div', { style: s.card },
-            e('div', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px' } }, 'Dividend Analysis (Selected Period)'),
-            e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '12px' } },
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Frequency'), e('br'), e('strong', null, divAnalysis.frequency)),
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Latest'), e('br'), e('strong', { style: { color: '#3fb950' } }, formatCurrency(divAnalysis.latestDividend))),
-              e('div', null, e('span', { style: { color: '#8b949e' } }, 'Total in Period'), e('br'), e('strong', null, formatCurrency(divAnalysis.totalDividendInPeriod)))
-            ),
-            divAnalysis.yearlyData && divAnalysis.yearlyData.length > 0 && e(DividendChart, { data: divAnalysis.yearlyData })
-          ),
-          
-          // No dividends message
-          divAnalysis && divAnalysis.dividendCount === 0 && e('div', { style: Object.assign({}, s.card, { background: 'rgba(187,128,9,0.1)', border: '1px solid rgba(187,128,9,0.3)' }) },
-            e('div', { style: { fontSize: '14px', fontWeight: '600', color: '#d29922', marginBottom: '8px' } }, 'No Dividends in Selected Period'),
-            e('div', { style: { fontSize: '13px', color: '#8b949e' } }, 
-              searchedTicker === 'BA' ? 'Boeing suspended its dividend in March 2020 due to the 737 MAX crisis and COVID-19 pandemic. The company had paid dividends for 78 consecutive years before the suspension.' :
-              'This stock did not pay any dividends during your selected date range (' + formatDate(investmentDate) + ' to ' + formatDate(endDate) + ').'
-            )
-          ),
+var apiCount=(massiveKey?1:0)+(finnhubKey?1:0)+(fmpKey?1:0)+(alphaVantageKey?1:0)+1;
 
-          // Tabs
-          e('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto' } },
-            ['dividends', 'splits', 'upcoming'].map(function(tab) {
-              var cnt = tab === 'dividends' ? filteredDividends.length : tab === 'splits' ? filteredSplits.length : stats.upcomingDividends.length + stats.upcomingSplits.length;
-              return e('button', { key: tab, onClick: function() { setActiveTab(tab); }, style: { padding: '10px 16px', background: activeTab === tab ? 'rgba(31,111,235,0.2)' : 'rgba(48,54,61,0.3)', border: activeTab === tab ? '1px solid rgba(31,111,235,0.5)' : '1px solid transparent', borderRadius: '8px', color: activeTab === tab ? '#58a6ff' : '#8b949e', fontSize: '13px', fontWeight: '500', whiteSpace: 'nowrap', cursor: 'pointer' } }, tab.charAt(0).toUpperCase() + tab.slice(1) + ' (' + cnt + ')');
-            })
-          ),
+var s={
+container:{minHeight:'100vh',background:'linear-gradient(135deg,#0a0f1a,#1a1f2e,#0d1117)',paddingBottom:'20px'},
+header:{background:'rgba(13,17,23,0.95)',backdropFilter:'blur(20px)',borderBottom:'1px solid rgba(48,54,61,0.6)',padding:'16px',position:'sticky',top:0,zIndex:100},
+card:{background:'rgba(13,17,23,0.6)',border:'1px solid rgba(48,54,61,0.8)',borderRadius:'12px',padding:'16px',marginBottom:'12px'},
+input:{width:'100%',padding:'10px 12px',background:'rgba(13,17,23,0.6)',border:'1px solid rgba(48,54,61,0.8)',borderRadius:'8px',color:'#e6edf3',fontSize:'14px',outline:'none',boxSizing:'border-box'},
+btn:{width:'100%',padding:'16px',background:'linear-gradient(135deg,#1f6feb,#58a6ff)',border:'none',borderRadius:'12px',color:'#fff',fontSize:'16px',fontWeight:'600',cursor:'pointer'},
+label:{display:'block',marginBottom:'4px',fontSize:'11px',color:'#8b949e',fontWeight:'500'},
+link:{color:'#58a6ff',textDecoration:'none',fontSize:'11px'}
+};
 
-          // Dividends tab
-          activeTab === 'dividends' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
-            filteredDividends.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No dividends in selected period') :
-            e('div', { style: { maxHeight: '400px', overflowY: 'auto' } },
-              filteredDividends.map(function(div, i) {
-                return e('div', { key: div.id || i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
-                  e('div', null,
-                    e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(div.ex_dividend_date)),
-                    e('div', { style: { fontSize: '11px', color: '#8b949e' } }, 'Pay: ' + (div.pay_date ? formatDate(div.pay_date) : 'TBD')),
-                    e('a', { 
-                      href: 'https://massive.com/quote/' + searchedTicker, 
-                      target: '_blank', 
-                      style: { fontSize: '10px', color: '#58a6ff', textDecoration: 'none' }
-                    }, 'View on Massive →')
-                  ),
-                  e('div', { style: { textAlign: 'right' } },
-                    e('div', { style: { fontSize: '16px', fontWeight: '600', color: '#3fb950' } }, formatCurrency(div.cash_amount)),
-                    e('div', { style: { fontSize: '10px', padding: '2px 6px', background: div.dividend_type === 'CD' ? 'rgba(46,160,67,0.15)' : 'rgba(187,128,9,0.15)', color: div.dividend_type === 'CD' ? '#3fb950' : '#d29922', borderRadius: '4px', display: 'inline-block' } },
-                      div.dividend_type === 'CD' ? 'Regular' : div.dividend_type === 'SC' ? 'Special' : div.dividend_type === 'LT' ? 'Long-term' : div.dividend_type === 'ST' ? 'Short-term' : 'Cash'
-                    )
-                  )
-                );
-              })
-            )
-          ),
+function renderEvent(ev,i){
+var badge='';var icon='';var content=null;
+if(ev.type==='dividend'){badge=e('span',{className:'event-badge badge-dividend'},'Dividend');icon='💰';content=e('div',null,e('strong',{style:{color:'#3fb950'}},fmtC(ev.amount,'USD')))}
+else if(ev.type==='split'){badge=e('span',{className:'event-badge badge-split'},'Split');icon='✂️';content=e('div',null,e('strong',{style:{color:'#58a6ff',fontFamily:'monospace'}},ev.split_to+':'+ev.split_from))}
+else if(ev.type==='earnings'){badge=e('span',{className:'event-badge badge-earnings'},'Earnings');icon='📊';var beat=ev.epsActual&&ev.epsEstimate&&ev.epsActual>ev.epsEstimate;content=e('div',{style:{fontSize:'12px'}},ev.epsActual!==null?e('span',null,'EPS: ',e('strong',{style:{color:beat?'#3fb950':'#e6edf3'}},'$'+(ev.epsActual||0).toFixed(2))):ev.epsEstimate?e('span',null,'Est: $',ev.epsEstimate.toFixed(2)):null)}
+else if(ev.type==='insider'){badge=e('span',{className:'event-badge badge-insider'},'Insider');icon=ev.change>0?'🟢':'🔴';content=e('div',{style:{fontSize:'12px'}},e('strong',null,ev.name||'Insider'),' ',e('span',{style:{color:ev.change>0?'#3fb950':'#f85149'}},ev.change>0?'+':'',fmtN(ev.change||0)))}
+else if(ev.type==='filing'){badge=e('span',{className:'event-badge badge-filing'},ev.form||'Filing');icon='📄';content=e('div',{style:{fontSize:'12px'}},ev.form,ev.url&&e('a',{href:ev.url,target:'_blank',style:{marginLeft:'8px',color:'#58a6ff'}},'→'))}
+else if(ev.type==='secFiling'){badge=e('span',{className:'event-badge badge-filing'},ev.form);icon='🏛️';content=e('div',{style:{fontSize:'12px'}},e('strong',null,ev.form),ev.description&&e('span',{style:{marginLeft:'8px',color:'#8b949e'}},ev.description.slice(0,40)))}
+else if(ev.type==='recommendation'){badge=e('span',{className:'event-badge badge-upgrade'},'Analyst');icon='📈';content=e('div',{style:{fontSize:'11px'}},e('span',{style:{color:'#3fb950'}},'Buy:'+(ev.strongBuy||0)+'/'+(ev.buy||0)),e('span',{style:{marginLeft:'6px',color:'#d29922'}},'Hold:'+(ev.hold||0)),e('span',{style:{marginLeft:'6px',color:'#f85149'}},'Sell:'+(ev.sell||0)))}
+else if(ev.type==='news'){badge=e('span',{className:'event-badge badge-news'},'News');icon='📰';content=e('div',{style:{fontSize:'12px'}},ev.title?ev.title.slice(0,50)+'...':'News',ev.url&&e('a',{href:ev.url,target:'_blank',style:{marginLeft:'6px',color:'#58a6ff'}},'→'))}
+else if(ev.type==='press'){badge=e('span',{className:'event-badge badge-press'},'Press');icon='📢';content=e('div',{style:{fontSize:'12px'}},ev.title?ev.title.slice(0,50)+'...':'Press Release')}
+else if(ev.type==='priceTarget'){badge=e('span',{className:'event-badge badge-price-target'},'Target');icon='🎯';content=e('div',{style:{fontSize:'12px'}},e('strong',{style:{color:'#3fb950'}},'$'+ev.priceTarget),e('span',{style:{marginLeft:'6px',color:'#8b949e'}},ev.company||''))}
+else if(ev.type==='upgrade'){var isUp=ev.action&&ev.action.toLowerCase().includes('upgrade');badge=e('span',{className:isUp?'event-badge badge-upgrade':'event-badge badge-downgrade'},ev.action||'Rating');icon=isUp?'⬆️':'⬇️';content=e('div',{style:{fontSize:'12px'}},ev.company,ev.toGrade&&e('span',{style:{marginLeft:'6px'}},ev.toGrade))}
+return e('div',{key:i,style:{display:'flex',gap:'10px',padding:'12px 14px',borderTop:i>0?'1px solid rgba(48,54,61,0.4)':'none',alignItems:'flex-start'}},
+e('div',{style:{fontSize:'18px',width:'28px',textAlign:'center'}},icon),
+e('div',{style:{flex:1}},e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'2px'}},badge,e('span',{style:{fontSize:'11px',color:'#8b949e'}},fmtD(ev.date)),ev.source&&e('span',{style:{fontSize:'9px',color:'#6e7681',marginLeft:'auto'}},ev.source)),content))}
 
-          // Splits tab
-          activeTab === 'splits' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
-            filteredSplits.length === 0 ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No stock splits in selected period') :
-            e('div', null, filteredSplits.map(function(sp, i) {
-              var rev = sp.split_from > sp.split_to;
-              return e('div', { key: sp.id || i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
-                e('div', null, 
-                  e('div', { style: { fontSize: '14px', fontWeight: '500' } }, formatDate(sp.execution_date)), 
-                  e('div', { style: { fontSize: '12px', color: rev ? '#f85149' : '#3fb950' } }, rev ? 'Reverse' : 'Forward'),
-                  e('a', { 
-                    href: 'https://massive.com/quote/' + searchedTicker, 
-                    target: '_blank', 
-                    style: { fontSize: '10px', color: '#58a6ff', textDecoration: 'none' }
-                  }, 'View on Massive →')
-                ),
-                e('div', { style: { fontSize: '20px', fontWeight: '700', color: '#58a6ff', fontFamily: 'monospace' } }, sp.split_to + ':' + sp.split_from)
-              );
-            }))
-          ),
+// Setup screen
+if(showSetup){
+return e('div',{style:s.container},
+e('header',{style:s.header},e('div',{style:{display:'flex',alignItems:'center',gap:'12px'}},e('div',{style:{width:'36px',height:'36px',background:'linear-gradient(135deg,#58a6ff,#1f6feb)',borderRadius:'10px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:'bold',color:'white'}},'CA'),e('h1',{style:{margin:0,fontSize:'18px',fontWeight:'600'}},'Corporate Actions Tracker'))),
+e('main',{style:{padding:'16px'}},
+e('div',{style:s.card},
+e('h2',{style:{margin:'0 0 12px',fontSize:'16px',fontWeight:'600'}},searchedTicker?'New Search':'Get Started'),
 
-          // Upcoming tab
-          activeTab === 'upcoming' && e('div', { style: Object.assign({}, s.card, { padding: 0, overflow: 'hidden' }) },
-            (stats.upcomingDividends.length === 0 && stats.upcomingSplits.length === 0) ? e('div', { style: { padding: '32px', textAlign: 'center', color: '#8b949e' } }, 'No upcoming events') :
-            e('div', null,
-              stats.upcomingDividends.map(function(div, i) {
-                return e('div', { key: 'div-' + i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: i > 0 ? '1px solid rgba(48,54,61,0.4)' : 'none' } },
-                  e('div', { style: { width: '40px', height: '40px', background: 'rgba(46,160,67,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' } }, '💰'),
-                  e('div', { style: { flex: 1 } }, 
-                    e('div', { style: { fontWeight: '600' } }, 'Dividend: ' + formatCurrency(div.cash_amount)),
-                    e('div', { style: { fontSize: '12px', color: '#8b949e' } }, 'Ex-div: ' + formatDate(div.ex_dividend_date))
-                  )
-                );
-              }),
-              stats.upcomingSplits.map(function(sp, i) {
-                return e('div', { key: 'sp-' + i, style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderTop: '1px solid rgba(48,54,61,0.4)' } },
-                  e('div', { style: { width: '40px', height: '40px', background: 'rgba(31,111,235,0.15)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' } }, '✂️'),
-                  e('div', { style: { flex: 1 } }, 
-                    e('div', { style: { fontWeight: '600' } }, 'Split: ' + sp.split_to + ':' + sp.split_from),
-                    e('div', { style: { fontSize: '12px', color: '#8b949e' } }, formatDate(sp.execution_date))
-                  )
-                );
-              })
-            )
-          ),
+// Collapsible API Keys Section
+e('div',{style:{marginBottom:'16px'}},
+e('div',{className:'collapsible-header',onClick:function(){setKeysExpanded(!keysExpanded)}},
+e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+e('span',{style:{fontSize:'14px'}},'🔑'),
+e('span',{style:{fontSize:'13px',fontWeight:'500'}},'API Keys'),
+e('span',{style:{fontSize:'11px',color:'#8b949e',marginLeft:'8px'}},apiCount+' source'+(apiCount>1?'s':'')+' configured')
+),
+e('span',{className:'chevron'+(keysExpanded?' rotated':''),style:{fontSize:'12px',color:'#8b949e'}},keysExpanded?'▲':'▼')
+),
+e('div',{className:'collapsible-content'+(keysExpanded?' expanded':' collapsed')},
+e('div',{style:{padding:'12px 0',display:'flex',flexDirection:'column',gap:'10px'}},
+// SEC EDGAR (always shown first - it's free)
+e('div',{style:{padding:'10px',background:'rgba(46,160,67,0.1)',border:'1px solid rgba(46,160,67,0.2)',borderRadius:'6px'}},
+e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+e('span',{style:{fontSize:'12px',color:'#3fb950',fontWeight:'500'}},'🏛️ SEC EDGAR'),
+e('span',{style:{fontSize:'10px',color:'#3fb950'}},'✓ FREE')
+),
+e('div',{style:{fontSize:'10px',color:'#8b949e',marginTop:'4px'}},'10-K, 10-Q, 8-K, DEF 14A, Form 4')
+),
+// Massive
+e('div',{style:{padding:'10px',background:'rgba(48,54,61,0.2)',borderRadius:'6px'}},
+e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}},e('label',{style:s.label},'Massive.com'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'5/min')),
+e('input',{type:'password',value:massiveKey,onChange:function(ev){setMassiveKey(ev.target.value)},placeholder:'Dividends, Splits, Prices',style:s.input}),
+e('a',{href:'https://massive.com',target:'_blank',style:s.link},'Get key →')
+),
+// Finnhub
+e('div',{style:{padding:'10px',background:'rgba(48,54,61,0.2)',borderRadius:'6px'}},
+e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}},e('label',{style:s.label},'Finnhub'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'60/min')),
+e('input',{type:'password',value:finnhubKey,onChange:function(ev){setFinnhubKey(ev.target.value)},placeholder:'Earnings, Insiders, Filings',style:s.input}),
+e('a',{href:'https://finnhub.io/register',target:'_blank',style:s.link},'Get key →')
+),
+// FMP
+e('div',{style:{padding:'10px',background:'rgba(48,54,61,0.2)',borderRadius:'6px'}},
+e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}},e('label',{style:s.label},'FMP'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'250/day')),
+e('input',{type:'password',value:fmpKey,onChange:function(ev){setFmpKey(ev.target.value)},placeholder:'News, Press, Targets',style:s.input}),
+e('a',{href:'https://site.financialmodelingprep.com/developer',target:'_blank',style:s.link},'Get key →')
+),
+// Alpha Vantage
+e('div',{style:{padding:'10px',background:'rgba(48,54,61,0.2)',borderRadius:'6px'}},
+e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'4px'}},e('label',{style:s.label},'Alpha Vantage'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'25/day')),
+e('input',{type:'password',value:alphaVantageKey,onChange:function(ev){setAlphaVantageKey(ev.target.value)},placeholder:'Company Overview',style:s.input}),
+e('a',{href:'https://www.alphavantage.co/support/#api-key',target:'_blank',style:s.link},'Get key →')
+)
+))
+),
 
-          // Footer with links
-          e('div', { style: { marginTop: '20px', padding: '16px', background: 'rgba(48,54,61,0.2)', borderRadius: '12px', fontSize: '12px' } },
-            e('div', { style: { marginBottom: '8px' } },
-              e('span', { style: { color: '#8b949e' } }, 'Data provided by '),
-              e('a', { href: 'https://massive.com', target: '_blank', style: s.link }, 'Massive (formerly Polygon.io)')
-            ),
-            e('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px' } },
-              e('a', { href: 'https://www.investopedia.com/terms/c/corporateaction.asp', target: '_blank', style: s.link }, 'Learn about corporate actions'),
-              e('a', { href: 'https://en.wikipedia.org/wiki/Corporate_action', target: '_blank', style: s.link }, 'Types of corporate actions'),
-              e('a', { href: 'https://www.investor.gov/introduction-investing/investing-basics/glossary', target: '_blank', style: s.link }, 'Investment glossary')
-            )
-          )
-        )
-      );
-    }
+// Ticker and settings (always visible)
+e('div',{style:{display:'flex',flexDirection:'column',gap:'12px'}},
+e('div',null,
+e('label',{style:s.label},'Stock Ticker'),
+e('input',{type:'text',value:ticker,onChange:function(ev){setTicker(ev.target.value.toUpperCase())},placeholder:'e.g. AAPL, MSFT, GOOGL',style:Object.assign({},s.input,{fontSize:'16px',padding:'14px'})}),
+recentSearches.length>0&&e('div',{style:{display:'flex',gap:'6px',marginTop:'8px',flexWrap:'wrap'}},recentSearches.map(function(t){return e('button',{key:t,onClick:function(){setTicker(t)},style:{padding:'6px 12px',background:'rgba(88,166,255,0.1)',border:'1px solid rgba(88,166,255,0.3)',borderRadius:'6px',color:'#58a6ff',fontSize:'12px',cursor:'pointer'}},t)}))
+),
+e('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},
+e('div',null,e('label',{style:s.label},'Start Date'),e('input',{type:'date',value:investmentDate,onChange:function(ev){setInvestmentDate(ev.target.value)},style:s.input})),
+e('div',null,e('label',{style:s.label},'End Date'),e('input',{type:'date',value:endDate,onChange:function(ev){setEndDate(ev.target.value)},style:s.input}))
+),
+e('div',null,e('label',{style:s.label},'Investment Amount'),e('input',{type:'number',value:investmentAmount,onChange:function(ev){setInvestmentAmount(parseFloat(ev.target.value)||0)},style:s.input})),
+e('button',{onClick:fetchData,disabled:loading||!ticker,style:Object.assign({},s.btn,{opacity:(loading||!ticker)?0.6:1})},loading?(progress||'Loading...'):'Analyse Corporate Actions')
+)),
+error&&e('div',{style:{background:'rgba(248,81,73,0.1)',border:'1px solid rgba(248,81,73,0.4)',borderRadius:'8px',padding:'12px',color:'#f85149',fontSize:'13px',marginTop:'12px'}},error)
+))}
 
-    ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+// Results screen
+return e('div',{style:s.container},
+e('header',{style:s.header},e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},e('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},e('div',{style:{width:'32px',height:'32px',background:'linear-gradient(135deg,#58a6ff,#1f6feb)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',fontWeight:'bold',color:'white'}},'CA'),e('div',null,e('h1',{style:{margin:0,fontSize:'16px',fontWeight:'600'}},searchedTicker),tickerDetails&&e('p',{style:{margin:0,fontSize:'10px',color:'#8b949e'}},tickerDetails.name))),e('button',{onClick:function(){setShowSetup(true)},style:{padding:'6px 12px',background:'linear-gradient(135deg,#1f6feb,#58a6ff)',border:'none',borderRadius:'6px',color:'#fff',fontSize:'12px',fontWeight:'600',cursor:'pointer'}},'New'))),
+e('main',{style:{padding:'12px'}},
+e('div',{style:{fontSize:'11px',color:'#8b949e',marginBottom:'10px',textAlign:'center'}},fmtD(investmentDate)+' → '+fmtD(endDate)+' • ',e('strong',null,allEvents.length),' events'),
+currentPrice&&e('div',{style:Object.assign({},s.card,{display:'flex',alignItems:'center',padding:'12px'})},e('div',{style:{flex:1}},e('div',{style:{fontSize:'18px',fontWeight:'700'}},searchedTicker)),e('div',{style:{textAlign:'right'}},e('div',{style:{fontSize:'22px',fontWeight:'700'}},fmtC(currentPrice,'USD')),divAnalysis&&divAnalysis.currentYield>0&&e('div',{style:{fontSize:'11px',color:'#3fb950'}},divAnalysis.currentYield.toFixed(2)+'% yield'))),
+returnCalc&&e('div',{style:Object.assign({},s.card,{padding:'12px',background:'linear-gradient(135deg,rgba(46,160,67,0.1),rgba(35,134,54,0.05))'})},
+e('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'10px',textAlign:'center'}},
+e('div',null,e('div',{style:{fontSize:'10px',color:'#8b949e'}},'Return'),e('div',{style:{fontSize:'18px',fontWeight:'700',color:returnCalc.percentReturn>=0?'#3fb950':'#f85149'}},fmtP(returnCalc.percentReturn))),
+e('div',null,e('div',{style:{fontSize:'10px',color:'#8b949e'}},'Final'),e('div',{style:{fontSize:'16px',fontWeight:'700'}},fmtC(returnCalc.totalReturn,'USD'))),
+e('div',null,e('div',{style:{fontSize:'10px',color:'#8b949e'}},'Dividends'),e('div',{style:{fontSize:'16px',fontWeight:'700',color:'#3fb950'}},fmtC(returnCalc.totalDividendIncome,'USD')))
+)),
+e('div',{style:{display:'flex',gap:'4px',marginBottom:'10px',overflowX:'auto',flexWrap:'wrap'}},
+[{key:'all',label:'All '+eventCounts.all},{key:'dividend',label:'💰'+eventCounts.dividend},{key:'split',label:'✂️'+eventCounts.split},{key:'earnings',label:'📊'+eventCounts.earnings},{key:'secFiling',label:'🏛️'+eventCounts.secFiling},{key:'insider',label:'🟢'+eventCounts.insider},{key:'news',label:'📰'+eventCounts.news},{key:'priceTarget',label:'🎯'+eventCounts.priceTarget},{key:'upgrade',label:'⬆️'+eventCounts.upgrade}].filter(function(t){return t.key==='all'||eventCounts[t.key]>0}).map(function(tab){
+return e('button',{key:tab.key,onClick:function(){setActiveTab(tab.key)},style:{padding:'5px 8px',background:activeTab===tab.key?'rgba(31,111,235,0.2)':'rgba(48,54,61,0.3)',border:activeTab===tab.key?'1px solid rgba(31,111,235,0.5)':'1px solid transparent',borderRadius:'4px',color:activeTab===tab.key?'#58a6ff':'#8b949e',fontSize:'10px',cursor:'pointer'}},tab.label)})),
+e('div',{style:Object.assign({},s.card,{padding:0,overflow:'hidden'})},
+filteredEvents.length===0?e('div',{style:{padding:'24px',textAlign:'center',color:'#8b949e',fontSize:'13px'}},'No events'):
+e('div',{style:{maxHeight:'400px',overflowY:'auto'}},filteredEvents.slice(0,80).map(renderEvent))
+),
+e('div',{style:{marginTop:'12px',fontSize:'10px',color:'#6e7681',textAlign:'center'}},
+'Data: ',massiveKey&&e('span',null,'Massive • '),finnhubKey&&e('span',null,'Finnhub • '),fmpKey&&e('span',null,'FMP • '),alphaVantageKey&&e('span',null,'AlphaVantage • '),e('span',null,'SEC EDGAR')
+)
+))}
+ReactDOM.createRoot(document.getElementById('root')).render(e(App));
   </script>
 </body>
 </html>

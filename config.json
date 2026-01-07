@@ -1,0 +1,32 @@
+{
+  "apis": {
+    "massive": {
+      "key": "y5yrPRI8ia7nvvjNdqWMraHcrvAwZHBy",
+      "description": "Massive.com (formerly Polygon.io) - Dividends, Splits, Prices",
+      "rateLimit": "5 calls/min",
+      "signupUrl": "https://massive.com"
+    },
+    "finnhub": {
+      "key": "d57suq9r01qrcrndm7tgd57suq9r01qrcrndm7u0",
+      "description": "Finnhub - Earnings, Insiders, SEC Filings, Analyst Ratings",
+      "rateLimit": "60 calls/min",
+      "signupUrl": "https://finnhub.io/register"
+    },
+    "fmp": {
+      "key": "IBIH7sj5siaIF3Tcj8zZe1xQvwcojPBn",
+      "description": "Financial Modeling Prep - News, Press Releases, Price Targets, Upgrades",
+      "rateLimit": "250 calls/day",
+      "signupUrl": "https://site.financialmodelingprep.com/developer"
+    },
+    "alphaVantage": {
+      "key": "Y58G4Q1ER0ITBYW5",
+      "description": "Alpha Vantage - Earnings Calendar, Dividends, Company Overview",
+      "rateLimit": "25 calls/day",
+      "signupUrl": "https://www.alphavantage.co/support/#api-key"
+    }
+  },
+  "settings": {
+    "defaultInvestmentAmount": 10000,
+    "defaultStartDate": "2020-01-01"
+  }
+}
