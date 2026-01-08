@@ -1,32 +1,43 @@
 {
   "apis": {
+    "eodhd": {
+      "key": " 694fcb78c13f70.94457914",
+      "description": "EODHD - Best quality dividend/split data (20 calls/day free)",
+      "signup": "https://eodhd.com/register"
+      "enabled": true
+    },
     "massive": {
       "key": "y5yrPRI8ia7nvvjNdqWMraHcrvAwZHBy",
       "description": "Massive.com (formerly Polygon.io) - Dividends, Splits, Prices",
       "rateLimit": "5 calls/min",
       "signupUrl": "https://massive.com"
+      "enabled": true
     },
     "finnhub": {
       "key": "d57suq9r01qrcrndm7tgd57suq9r01qrcrndm7u0",
       "description": "Finnhub - Earnings, Insiders, SEC Filings, Analyst Ratings",
       "rateLimit": "60 calls/min",
       "signupUrl": "https://finnhub.io/register"
+      "enabled": true
     },
     "fmp": {
       "key": "IBIH7sj5siaIF3Tcj8zZe1xQvwcojPBn",
       "description": "Financial Modeling Prep - News, Press Releases, Price Targets, Upgrades",
       "rateLimit": "250 calls/day",
       "signupUrl": "https://site.financialmodelingprep.com/developer"
+      "enabled": true
     },
     "alphaVantage": {
       "key": "PS3NNBGK53WUY148",
       "description": "Alpha Vantage - Earnings Calendar, Dividends, Company Overview",
       "rateLimit": "25 calls/day",
       "signupUrl": "https://www.alphavantage.co/support/#api-key"
+      "enabled": true
     }
   },
   "settings": {
+    "defaultStartDate": "2020-01-01",
     "defaultInvestmentAmount": 10000,
-    "defaultStartDate": "2020-01-01"
+    "maxEventsDisplay": 100
   }
 }
