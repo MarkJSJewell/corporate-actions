@@ -19,7 +19,7 @@
       "signupUrl": "https://site.financialmodelingprep.com/developer"
     },
     "alphaVantage": {
-      "key": "Y58G4Q1ER0ITBYW5",
+      "key": "PS3NNBGK53WUY148",
       "description": "Alpha Vantage - Earnings Calendar, Dividends, Company Overview",
       "rateLimit": "25 calls/day",
       "signupUrl": "https://www.alphavantage.co/support/#api-key"
