@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0a0f1a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Corporate Actions Tracker</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}html,body,#root{height:100%;width:100%}
@@ -70,7 +70,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script>
 var e=React.createElement,useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useRef=React.useRef;
-function fmtC(v,c){if(v===null||v===undefined)return'-';try{return new Intl.NumberFormat('en-US',{style:'currency',currency:c||'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(v)}catch(e){return'$'+v.toFixed(2)}}
+function fmtC(v,c){if(v===null||v===undefined)return'-';try{return new Intl.NumberFormat('en-US',{style:'currency',currency:c||'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(v)}catch(e){return'$'+Number(v).toFixed(2)}}
 function fmtP(v){return(v>=0?'+':'')+v.toFixed(2)+'%'}
 function fmtD(d){if(!d)return'-';return new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
 function fmtN(v){if(!v)return'0';if(Math.abs(v)>=1e9)return(v/1e9).toFixed(1)+'B';if(Math.abs(v)>=1e6)return(v/1e6).toFixed(1)+'M';if(Math.abs(v)>=1e3)return(v/1e3).toFixed(1)+'K';return v.toLocaleString()}
@@ -117,7 +117,6 @@ var _sd=useState('2020-01-01'),investmentDate=_sd[0],setInvestmentDate=_sd[1];
 var _ed=useState(new Date().toISOString().split('T')[0]),endDate=_ed[0],setEndDate=_ed[1];
 var _ld=useState(false),loading=_ld[0],setLoading=_ld[1];
 var _er=useState(null),error=_er[0],setError=_er[1];
-// API Keys
 var _fk=useState(localStorage.getItem('finnhubApiKey')||''),finnhubKey=_fk[0],setFinnhubKey=_fk[1];
 var _fmpk=useState(localStorage.getItem('fmpApiKey')||''),fmpKey=_fmpk[0],setFmpKey=_fmpk[1];
 var _eodk=useState(localStorage.getItem('eodhdApiKey')||''),eodhdKey=_eodk[0],setEodhdKey=_eodk[1];
@@ -181,7 +180,6 @@ if(filtered.length>0)setShowLookup(true);
 }}
 
 function selectLookupTicker(sym){setTicker(sym);setTickerValid(true);setShowLookup(false);setTickerLookup([])}
-function validateTicker(){setShowLookup(false);if(!ticker){setTickerValid(null);return}if(tickerValid===true)return;setTickerChecking(true);if(finnhubKey){fetch('https://finnhub.io/api/v1/stock/profile2?symbol='+ticker+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){setTickerValid(d&&d.name&&d.name.length>0);setTickerChecking(false)}).catch(function(){setTickerValid(false);setTickerChecking(false)})}else{setTickerValid(true);setTickerChecking(false)}}
 
 function calcReturns(prices,divs,splts){
 if(!prices||prices.length<2)return;
@@ -213,193 +211,166 @@ if(eodhdKey){
 setProgress('Fetching from EODHD...');
 var eodSymbol=t+'.US';
 
-// EODHD Dividends
 promises.push(
 fetch('https://eodhd.com/api/div/'+eodSymbol+'?from='+investmentDate+'&to='+endDate+'&api_token='+eodhdKey+'&fmt=json')
 .then(function(r){return r.json()})
 .then(function(d){
 console.log('EODHD dividends:',d);
-if(Array.isArray(d)&&d.length>0){
+if(Array.isArray(d)&&d.length>0&&!d.error){
 results.dividends=d.map(function(x){return{
-type:'dividend',
-date:x.date,
-exDate:x.date,
-recordDate:x.recordDate,
-paymentDate:x.paymentDate,
-declarationDate:x.declarationDate,
-dividend:x.value,
-value:x.value,
-unadjustedValue:x.unadjustedValue,
-currency:x.currency,
-source:'EODHD',
-link:'https://eodhd.com/financial-summary/'+t+'.US'
+type:'dividend',date:x.date,exDate:x.date,recordDate:x.recordDate,paymentDate:x.paymentDate,
+declarationDate:x.declarationDate,dividend:x.value,value:x.value,unadjustedValue:x.unadjustedValue,
+currency:x.currency,source:'EODHD',link:'https://eodhd.com/financial-summary/'+t+'.US'
 }});
 status.dividends='✓ '+d.length+' (EODHD)';
-}else if(d.error){status.dividends='EODHD: '+d.error}
-else{status.dividends='0 (EODHD)'}
-}).catch(function(err){console.error('EODHD dividends error:',err);status.dividends='EODHD error'})
+}else{status.dividends=(d.error||'0')+' (EODHD)'}
+}).catch(function(err){console.error('EODHD div err:',err);status.dividends='Error'})
 );
 
-// EODHD Splits
 promises.push(
 fetch('https://eodhd.com/api/splits/'+eodSymbol+'?from='+investmentDate+'&to='+endDate+'&api_token='+eodhdKey+'&fmt=json')
 .then(function(r){return r.json()})
 .then(function(d){
 console.log('EODHD splits:',d);
-if(Array.isArray(d)&&d.length>0){
-results.splits=d.map(function(x){return{
-type:'split',date:x.date,split:x.split,
-ratio:x.split+':1',source:'EODHD',
-link:'https://eodhd.com/financial-summary/'+t+'.US'
-}});
+if(Array.isArray(d)&&d.length>0&&!d.error){
+results.splits=d.map(function(x){return{type:'split',date:x.date,split:x.split,ratio:x.split+':1',source:'EODHD'}});
 status.splits='✓ '+d.length+' (EODHD)';
 }else{status.splits='0 (EODHD)'}
-}).catch(function(err){console.error('EODHD splits error:',err);status.splits='EODHD error'})
+}).catch(function(err){console.error('EODHD split err:',err);status.splits='Error'})
 );
 
-// EODHD EOD Prices
 promises.push(
 fetch('https://eodhd.com/api/eod/'+eodSymbol+'?from='+investmentDate+'&to='+endDate+'&api_token='+eodhdKey+'&fmt=json')
 .then(function(r){return r.json()})
 .then(function(d){
 console.log('EODHD prices:',d);
-if(Array.isArray(d)&&d.length>0){
+if(Array.isArray(d)&&d.length>0&&!d.error){
 results.prices=d.map(function(x){return{t:new Date(x.date).getTime(),c:x.adjusted_close||x.close}});
 status.prices='✓ '+d.length+' days (EODHD)';
-}else{status.prices='No price data'}
-}).catch(function(err){console.error('EODHD prices error:',err);status.prices='EODHD error'})
+}else{status.prices='No data'}
+}).catch(function(err){console.error('EODHD price err:',err);status.prices='Error'})
 );
 }
 
-// FMP API - Fallback for Dividends/Splits, plus News
+// FMP API - NEW STABLE ENDPOINTS
 if(fmpKey){
 setProgress('Fetching from FMP...');
 
-// FMP Dividends (only if EODHD not configured)
-if(!eodhdKey){
+// FMP Dividends - NEW stable endpoint
+if(!eodhdKey||results.dividends.length===0){
 promises.push(
-fetch('https://financialmodelingprep.com/stable/dividends-company?symbol='+t+'&apikey='+fmpKey)
+fetch('https://financialmodelingprep.com/stable/dividends?symbol='+t+'&apikey='+fmpKey)
 .then(function(r){return r.json()})
 .then(function(d){
-console.log('FMP dividends:',d);
+console.log('FMP dividends (stable):',d);
 if(Array.isArray(d)&&d.length>0){
+if(results.dividends.length===0){
 results.dividends=d.map(function(x){return{
 type:'dividend',date:x.date,exDate:x.date,recordDate:x.recordDate,paymentDate:x.paymentDate,
-declarationDate:x.declarationDate,dividend:x.dividend,adjDividend:x.adjDividend,
-yield:x.yield,frequency:x.frequency,source:'FMP',
-link:'https://financialmodelingprep.com/financial-summary/'+t
+declarationDate:x.declarationDate,dividend:x.dividend||x.adjDividend,adjDividend:x.adjDividend,
+yield:x.yield,frequency:x.label,source:'FMP',link:'https://financialmodelingprep.com/financial-summary/'+t
 }});
+}
 status.dividends='✓ '+d.length+' (FMP)';
-}else{status.dividends='0 (FMP)'}
-}).catch(function(err){console.error('FMP dividends error:',err);status.dividends='FMP error'})
+}else{if(!status.dividends)status.dividends='0 (FMP)'}
+}).catch(function(err){console.error('FMP div err:',err);if(!status.dividends)status.dividends='Error'})
 );
+}
 
-// FMP Splits
+// FMP Splits - NEW stable endpoint
+if(!eodhdKey){
 promises.push(
-fetch('https://financialmodelingprep.com/api/v3/historical-price-full/stock_split/'+t+'?apikey='+fmpKey)
+fetch('https://financialmodelingprep.com/stable/splits?symbol='+t+'&apikey='+fmpKey)
 .then(function(r){return r.json()})
 .then(function(d){
-console.log('FMP splits:',d);
-if(d.historical&&d.historical.length>0){
-results.splits=d.historical.map(function(x){return{
-type:'split',date:x.date,numerator:x.numerator,denominator:x.denominator,
-ratio:x.numerator+':'+x.denominator,source:'FMP',
-link:'https://financialmodelingprep.com/financial-summary/'+t
-}});
-status.splits='✓ '+d.historical.length+' (FMP)';
+console.log('FMP splits (stable):',d);
+if(Array.isArray(d)&&d.length>0){
+results.splits=d.map(function(x){return{type:'split',date:x.date,numerator:x.numerator,denominator:x.denominator,ratio:x.numerator+':'+x.denominator,source:'FMP'}});
+status.splits='✓ '+d.length+' (FMP)';
 }else{status.splits='0 (FMP)'}
-}).catch(function(err){console.error('FMP splits error:',err);status.splits='FMP error'})
+}).catch(function(err){console.error('FMP split err:',err);status.splits='Error'})
 );
 
-// FMP Historical Prices
+// FMP Historical Prices - NEW stable endpoint
 promises.push(
-fetch('https://financialmodelingprep.com/api/v3/historical-price-full/'+t+'?from='+investmentDate+'&to='+endDate+'&apikey='+fmpKey)
+fetch('https://financialmodelingprep.com/stable/historical-price-eod/full?symbol='+t+'&from='+investmentDate+'&to='+endDate+'&apikey='+fmpKey)
 .then(function(r){return r.json()})
 .then(function(d){
-console.log('FMP prices:',d);
-if(d.historical&&d.historical.length>0){
+console.log('FMP prices (stable):',d);
+if(Array.isArray(d)&&d.length>0){
+results.prices=d.map(function(x){return{t:new Date(x.date).getTime(),c:x.adjClose||x.close}});
+status.prices='✓ '+d.length+' days (FMP)';
+}else if(d.historical&&d.historical.length>0){
 results.prices=d.historical.reverse().map(function(x){return{t:new Date(x.date).getTime(),c:x.adjClose||x.close}});
 status.prices='✓ '+d.historical.length+' days (FMP)';
 }
-}).catch(function(err){console.error('FMP prices error:',err)})
+}).catch(function(err){console.error('FMP price err:',err)})
 );
 }
 
-// FMP Quote
+// FMP Quote - NEW stable endpoint
 promises.push(
-fetch('https://financialmodelingprep.com/api/v3/quote/'+t+'?apikey='+fmpKey)
+fetch('https://financialmodelingprep.com/stable/quote?symbol='+t+'&apikey='+fmpKey)
 .then(function(r){return r.json()})
 .then(function(d){
-console.log('FMP quote:',d);
-if(Array.isArray(d)&&d[0]&&d[0].price){
+console.log('FMP quote (stable):',d);
+if(Array.isArray(d)&&d[0]){
 results.currentPrice=d[0].price;
 results.details={name:d[0].name,exchange:d[0].exchange};
-status.quote='✓ $'+d[0].price.toFixed(2);
+status.quote='✓ $'+(d[0].price||0).toFixed(2);
+}else if(d.price){
+results.currentPrice=d.price;
+results.details={name:d.name,exchange:d.exchange};
+status.quote='✓ $'+d.price.toFixed(2);
 }
-}).catch(function(err){console.error('FMP quote error:',err);status.quote='FMP error'})
+}).catch(function(err){console.error('FMP quote err:',err);status.quote='Error'})
 );
 
-// FMP News
+// FMP News - NEW stable endpoint
 promises.push(
-fetch('https://financialmodelingprep.com/api/v3/stock_news?tickers='+t+'&limit=30&apikey='+fmpKey)
+fetch('https://financialmodelingprep.com/stable/news/stock?symbols='+t+'&limit=30&apikey='+fmpKey)
 .then(function(r){return r.json()})
 .then(function(d){
-console.log('FMP news:',d);
+console.log('FMP news (stable):',d);
 if(Array.isArray(d)&&d.length>0){
-results.news=d.map(function(x){return{
-type:'news',date:x.publishedDate?x.publishedDate.split('T')[0]:null,
-title:x.title,source:'FMP',link:x.url,site:x.site
-}});
+results.news=d.map(function(x){return{type:'news',date:x.publishedDate?x.publishedDate.split('T')[0]:null,title:x.title,source:'FMP',link:x.url,site:x.site}});
 status.news='✓ '+d.length;
 }else{status.news='0'}
 }).catch(function(){status.news='Error'})
 );
 }
 
-// FINNHUB API - Earnings, Insiders, Search
+// FINNHUB API - Earnings, Insiders
 if(finnhubKey){
 setProgress('Fetching from Finnhub...');
 
-// Earnings
 promises.push(
 fetch('https://finnhub.io/api/v1/calendar/earnings?symbol='+t+'&from='+investmentDate+'&to='+endDate+'&token='+finnhubKey)
 .then(function(r){return r.json()})
 .then(function(d){
 console.log('Finnhub earnings:',d);
 if(d.earningsCalendar&&d.earningsCalendar.length>0){
-results.earnings=d.earningsCalendar.map(function(x){return{type:'earnings',date:x.date,epsActual:x.epsActual,epsEstimate:x.epsEstimate,source:'Finnhub',link:'https://finnhub.io/stock/'+t}});
+results.earnings=d.earningsCalendar.map(function(x){return{type:'earnings',date:x.date,epsActual:x.epsActual,epsEstimate:x.epsEstimate,source:'Finnhub'}});
 status.earnings='✓ '+d.earningsCalendar.length;
 }else{status.earnings='0'}
 }).catch(function(err){status.earnings='Error';console.error(err)})
 );
 
-// Insiders
 promises.push(
 fetch('https://finnhub.io/api/v1/stock/insider-transactions?symbol='+t+'&token='+finnhubKey)
 .then(function(r){return r.json()})
 .then(function(d){
 console.log('Finnhub insiders:',d);
 if(d.data&&d.data.length>0){
-results.insiders=d.data.map(function(x){return{type:'insider',date:x.transactionDate,name:x.name,change:x.change,shares:Math.abs(x.change),transactionPrice:x.transactionPrice,transactionType:x.change>0?'Buy':'Sell',source:'Finnhub',link:'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK='+t+'&type=4'}});
+results.insiders=d.data.map(function(x){return{type:'insider',date:x.transactionDate,name:x.name,change:x.change,shares:Math.abs(x.change),transactionPrice:x.transactionPrice,transactionType:x.change>0?'Buy':'Sell',source:'Finnhub'}});
 status.insiders='✓ '+d.data.length;
 }else{status.insiders='0'}
 }).catch(function(){status.insiders='Error'})
 );
 
-// Profile & Quote (if not from FMP)
 if(!fmpKey){
-promises.push(
-fetch('https://finnhub.io/api/v1/stock/profile2?symbol='+t+'&token='+finnhubKey)
-.then(function(r){return r.json()})
-.then(function(d){if(d&&d.name){results.details={name:d.name,exchange:d.exchange}}})
-.catch(function(){})
-);
-promises.push(
-fetch('https://finnhub.io/api/v1/quote?symbol='+t+'&token='+finnhubKey)
-.then(function(r){return r.json()})
-.then(function(d){if(d&&d.c&&d.c>0){results.currentPrice=d.c;status.quote='✓ $'+d.c.toFixed(2)}})
-.catch(function(){})
-);
+promises.push(fetch('https://finnhub.io/api/v1/stock/profile2?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d&&d.name){results.details={name:d.name,exchange:d.exchange}}}).catch(function(){}));
+promises.push(fetch('https://finnhub.io/api/v1/quote?symbol='+t+'&token='+finnhubKey).then(function(r){return r.json()}).then(function(d){if(d&&d.c&&d.c>0){results.currentPrice=d.c;status.quote='✓ $'+d.c.toFixed(2)}}).catch(function(){}));
 }
 }
 
@@ -434,7 +405,7 @@ results.secFilings=secFils;
 status.sec='✓ '+secFils.length;
 if(d.name&&!results.details){results.details={name:d.name}}
 }
-}).catch(function(err){status.sec='Error';console.error('SEC error:',err)})
+}).catch(function(err){status.sec='Error';console.error('SEC err:',err)})
 );
 
 setProgress('Processing...');
@@ -574,38 +545,14 @@ d.link?e('a',{href:d.link,target:'_blank',onClick:function(e){e.stopPropagation(
 ),
 selectedDividend===ev&&ev.type==='dividend'&&e('div',{style:{padding:'12px 16px',background:'rgba(46,160,67,0.05)',borderBottom:'1px solid rgba(48,54,61,0.4)'}},
 e('div',{className:'dividend-detail'},
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Ex-Dividend Date'),
-e('div',{className:'dividend-detail-value'},fmtD(ev.date||ev.exDate))
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Record Date'),
-e('div',{className:'dividend-detail-value'},fmtD(ev.recordDate)||'-')
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Payment Date'),
-e('div',{className:'dividend-detail-value'},fmtD(ev.paymentDate)||'-')
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Declaration Date'),
-e('div',{className:'dividend-detail-value'},fmtD(ev.declarationDate)||'-')
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Dividend'),
-e('div',{className:'dividend-detail-value',style:{color:'#3fb950'}},fmtC(ev.dividend||ev.value,ev.currency))
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Adj. Dividend'),
-e('div',{className:'dividend-detail-value'},fmtC(ev.adjDividend||ev.unadjustedValue)||'-')
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Yield'),
-e('div',{className:'dividend-detail-value'},ev.yield?(ev.yield*100).toFixed(2)+'%':'-')
-),
-e('div',{className:'dividend-detail-item'},
-e('div',{className:'dividend-detail-label'},'Frequency'),
-e('div',{className:'dividend-detail-value'},ev.frequency||'-')
-)
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Ex-Dividend Date'),e('div',{className:'dividend-detail-value'},fmtD(ev.date||ev.exDate))),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Record Date'),e('div',{className:'dividend-detail-value'},fmtD(ev.recordDate)||'-')),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Payment Date'),e('div',{className:'dividend-detail-value'},fmtD(ev.paymentDate)||'-')),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Declaration Date'),e('div',{className:'dividend-detail-value'},fmtD(ev.declarationDate)||'-')),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Dividend'),e('div',{className:'dividend-detail-value',style:{color:'#3fb950'}},fmtC(ev.dividend||ev.value,ev.currency))),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Adj. Dividend'),e('div',{className:'dividend-detail-value'},fmtC(ev.adjDividend||ev.unadjustedValue)||'-')),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Yield'),e('div',{className:'dividend-detail-value'},ev.yield?((typeof ev.yield==='number'?ev.yield*100:parseFloat(ev.yield)).toFixed(2)+'%'):'-')),
+e('div',{className:'dividend-detail-item'},e('div',{className:'dividend-detail-label'},'Frequency'),e('div',{className:'dividend-detail-value'},ev.frequency||'-'))
 )
 )
 )}
@@ -615,7 +562,7 @@ var isResults=props.isResults;
 return e('div',{className:'search-row',style:{display:'flex',gap:'10px',alignItems:'flex-end'}},
 e('div',{style:{flex:'1',minWidth:'150px',position:'relative'}},
 !isResults&&e('label',{style:s.label},'Stock Ticker'),
-e('input',{type:'text',value:ticker,onChange:function(ev){handleTickerInput(ev.target.value)},onBlur:function(){setTimeout(function(){setShowLookup(false)},200)},onFocus:function(){if(tickerLookup.length>0)setShowLookup(true)},onKeyDown:function(ev){if(ev.key==='Enter'&&canSubmit){setShowLookup(false);fetchData()}if(ev.key==='Tab'){validateTicker()}},placeholder:'Search company or ticker...',className:tickerChecking?'ticker-checking':tickerValid===true?'ticker-valid':tickerValid===false?'ticker-invalid':'',style:Object.assign({},s.input,{fontSize:isResults?'14px':'16px',padding:isResults?'10px 12px':'14px'})}),
+e('input',{type:'text',value:ticker,onChange:function(ev){handleTickerInput(ev.target.value)},onBlur:function(){setTimeout(function(){setShowLookup(false)},200)},onFocus:function(){if(tickerLookup.length>0)setShowLookup(true)},onKeyDown:function(ev){if(ev.key==='Enter'&&canSubmit){setShowLookup(false);fetchData()}},placeholder:'Search company or ticker...',className:tickerChecking?'ticker-checking':tickerValid===true?'ticker-valid':tickerValid===false?'ticker-invalid':'',style:Object.assign({},s.input,{fontSize:isResults?'14px':'16px',padding:isResults?'10px 12px':'14px'})}),
 showLookup&&tickerLookup.length>0&&e('div',{className:'lookup-dropdown'},tickerLookup.map(function(item,i){return e('div',{key:i,className:'lookup-item',onMouseDown:function(ev){ev.preventDefault();ev.stopPropagation();selectLookupTicker(item.symbol)}},e('div',null,e('div',{style:{fontWeight:'600',fontSize:'14px',color:'#58a6ff'}},item.symbol),e('div',{style:{fontSize:'11px',color:'#8b949e',maxWidth:'280px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},item.name)),e('span',{style:{fontSize:'11px',color:'#3fb950',fontWeight:'500'}},'Select'))})),
 tickerValid===false&&!tickerChecking&&e('div',{style:{fontSize:'10px',color:'#f85149',marginTop:'4px'}},'Ticker not found')
 ),
@@ -628,7 +575,6 @@ e('button',{onClick:function(){setShowLookup(false);fetchData()},disabled:!canSu
 
 var infoModal=e(InfoModal,{show:showInfo,onClose:function(){setShowInfo(false)}});
 
-// Setup screen
 if(showSetup&&!hasResults){
 return e('div',{style:s.container},
 infoModal,
@@ -654,141 +600,70 @@ e('span',{style:{fontSize:'12px',color:'#8b949e'}},keysExpanded?'▲':'▼')
 ),
 e('div',{className:'collapsible-content'+(keysExpanded||(!finnhubKey&&!fmpKey&&!eodhdKey)?' expanded':' collapsed')},
 e('div',{style:{padding:'12px 0',display:'flex',flexDirection:'column',gap:'8px'}},
-
-// EODHD - Primary for dividends
 e('div',{className:'api-key-row',style:{background:'rgba(46,160,67,0.1)',border:'1px solid rgba(46,160,67,0.2)'}},
-e('div',{className:'api-key-header'},
-e('label',{style:s.label},'🌟 EODHD (Dividends, Splits, Prices)'),
-e('span',{style:{fontSize:'9px',color:'#8b949e'}},'20/day FREE • Best quality')
-),
+e('div',{className:'api-key-header'},e('label',{style:s.label},'🌟 EODHD (Dividends, Splits, Prices)'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'20/day FREE')),
 e('input',{type:'password',value:eodhdKey,onChange:function(ev){setEodhdKey(ev.target.value)},placeholder:'EODHD API Key',style:s.input}),
 e('a',{href:'https://eodhd.com/register',target:'_blank',style:s.link},'Get free key at eodhd.com →')
 ),
-
-// FMP
 e('div',{className:'api-key-row'},
-e('div',{className:'api-key-header'},
-e('label',{style:s.label},'FMP (Dividends, Splits, Prices, News)'),
-e('span',{style:{fontSize:'9px',color:'#8b949e'}},'250/day FREE')
-),
+e('div',{className:'api-key-header'},e('label',{style:s.label},'FMP (Dividends, Splits, Prices, News)'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'250/day FREE')),
 e('input',{type:'password',value:fmpKey,onChange:function(ev){setFmpKey(ev.target.value)},placeholder:'FMP API Key',style:s.input}),
 e('a',{href:'https://site.financialmodelingprep.com/developer',target:'_blank',style:s.link},'Get free key at financialmodelingprep.com →')
 ),
-
-// Finnhub
 e('div',{className:'api-key-row'},
-e('div',{className:'api-key-header'},
-e('label',{style:s.label},'Finnhub (Earnings, Insiders, Search)'),
-e('span',{style:{fontSize:'9px',color:'#8b949e'}},'60/min FREE')
-),
+e('div',{className:'api-key-header'},e('label',{style:s.label},'Finnhub (Earnings, Insiders, Search)'),e('span',{style:{fontSize:'9px',color:'#8b949e'}},'60/min FREE')),
 e('input',{type:'password',value:finnhubKey,onChange:function(ev){setFinnhubKey(ev.target.value)},placeholder:'Finnhub API Key',style:s.input}),
 e('a',{href:'https://finnhub.io/register',target:'_blank',style:s.link},'Get free key at finnhub.io →')
 ),
-
-// SEC (always free)
-e('div',{className:'api-key-row',style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
-e('span',{style:{fontSize:'11px',color:'#8b949e'}},'🏛️ SEC EDGAR (Filings)'),
-e('span',{style:{fontSize:'10px',color:'#3fb950'}},'✓ Always Free')
-),
-
-e('div',{style:{padding:'8px',background:'rgba(88,166,255,0.1)',borderRadius:'6px',fontSize:'11px',color:'#58a6ff'}},
-'💡 Tip: EODHD has the best dividend data quality. FMP has more API calls. Use both for redundancy!'
-)
+e('div',{className:'api-key-row',style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},e('span',{style:{fontSize:'11px',color:'#8b949e'}},'🏛️ SEC EDGAR (Filings)'),e('span',{style:{fontSize:'10px',color:'#3fb950'}},'✓ Always Free')),
+e('div',{style:{padding:'8px',background:'rgba(88,166,255,0.1)',borderRadius:'6px',fontSize:'11px',color:'#58a6ff'}},'💡 Tip: EODHD has the best dividend quality. FMP has more API calls. Use both for redundancy!')
 ))
 ),
 e('div',{style:{display:'flex',flexDirection:'column',gap:'12px'}},
 SearchBar({isResults:false}),
-recentSearches.length>0&&e('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}},
-e('span',{style:{fontSize:'11px',color:'#6e7681'}},'Recent:'),
-recentSearches.map(function(t){return e('button',{key:t,onClick:function(){setTicker(t);setTickerValid(true)},style:{padding:'4px 10px',background:'rgba(88,166,255,0.1)',border:'1px solid rgba(88,166,255,0.3)',borderRadius:'4px',color:'#58a6ff',fontSize:'11px',cursor:'pointer'}},t)})
-),
+recentSearches.length>0&&e('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}},e('span',{style:{fontSize:'11px',color:'#6e7681'}},'Recent:'),recentSearches.map(function(t){return e('button',{key:t,onClick:function(){setTicker(t);setTickerValid(true)},style:{padding:'4px 10px',background:'rgba(88,166,255,0.1)',border:'1px solid rgba(88,166,255,0.3)',borderRadius:'4px',color:'#58a6ff',fontSize:'11px',cursor:'pointer'}},t)})),
 e('div',null,e('label',{style:s.label},'Investment Amount'),e('input',{type:'number',value:investmentAmount,onChange:function(ev){setInvestmentAmount(parseFloat(ev.target.value)||0)},style:s.input}))
 )),
-error&&e('div',{style:{background:'rgba(248,81,73,0.1)',border:'1px solid rgba(248,81,73,0.4)',borderRadius:'8px',padding:'12px',color:'#f85149',fontSize:'13px',marginTop:'12px'}},error),
-e('div',{style:{marginTop:'20px',padding:'14px',background:'rgba(48,54,61,0.2)',borderRadius:'8px'}},
-e('div',{style:{fontSize:'12px',fontWeight:'600',marginBottom:'10px',color:'#8b949e'}},'📊 Supported Events'),
-e('div',{style:{display:'flex',flexWrap:'wrap',gap:'6px'}},
-['💰 Dividends','✂️ Splits','📊 Earnings','🏛️ SEC Filings','👤 Insider Trades','📰 News'].map(function(t){
-return e('span',{key:t,className:'tooltip','data-tip':EVENT_TOOLTIPS[t.split(' ')[1]?.toLowerCase()]||'',style:{padding:'4px 8px',background:'rgba(88,166,255,0.1)',borderRadius:'4px',fontSize:'11px',color:'#8b949e'}},t)
-})
-)
-)
+error&&e('div',{style:{background:'rgba(248,81,73,0.1)',border:'1px solid rgba(248,81,73,0.4)',borderRadius:'8px',padding:'12px',color:'#f85149',fontSize:'13px',marginTop:'12px'}},error)
 ))}
 
-// Results screen
 return e('div',{style:s.container},
 infoModal,
 e('header',{style:s.header},
 e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
 e('div',{style:{width:'32px',height:'32px',background:'linear-gradient(135deg,#58a6ff,#1f6feb)',borderRadius:'8px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'14px',fontWeight:'bold',color:'white'}},'CA'),
-e('div',{style:{flex:1}},
-e('div',{style:{fontSize:'16px',fontWeight:'600'}},searchedTicker),
-tickerDetails&&e('div',{style:{fontSize:'11px',color:'#8b949e'}},tickerDetails.name)
-),
+e('div',{style:{flex:1}},e('div',{style:{fontSize:'16px',fontWeight:'600'}},searchedTicker),tickerDetails&&e('div',{style:{fontSize:'11px',color:'#8b949e'}},tickerDetails.name)),
 e('button',{onClick:function(){setShowInfo(true)},style:{background:'none',border:'none',color:'#8b949e',fontSize:'16px',cursor:'pointer'}},'ℹ️')
 ),
 SearchBar({isResults:true})
 ),
 e('main',{style:{padding:'12px'}},
-Object.keys(apiStatus).length>0&&e('div',{className:'api-status',style:{marginBottom:'10px'}},
-Object.keys(apiStatus).map(function(k){
-var isOk=apiStatus[k].startsWith('✓');
-return e('span',{key:k,className:'api-status-item '+(isOk?'api-ok':'api-err')},k+': '+apiStatus[k])
-})
-),
+Object.keys(apiStatus).length>0&&e('div',{className:'api-status',style:{marginBottom:'10px'}},Object.keys(apiStatus).map(function(k){var isOk=apiStatus[k].startsWith('✓');return e('span',{key:k,className:'api-status-item '+(isOk?'api-ok':'api-err')},k+': '+apiStatus[k])})),
 currentPrice&&e('div',{style:Object.assign({},s.card,{background:'linear-gradient(135deg,rgba(31,111,235,0.1),rgba(88,166,255,0.05))'})},
 e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
-e('div',null,
-e('div',{style:{fontSize:'24px',fontWeight:'700'}},fmtC(currentPrice)),
-divAnalysis&&divAnalysis.currentYield>0&&e('div',{style:{fontSize:'11px',color:'#3fb950'}},divAnalysis.currentYield.toFixed(2)+'% TTM Yield ('+divAnalysis.count+' payments)')
-),
-returnCalc&&e('div',{style:{textAlign:'right'}},
-e('div',{style:{fontSize:'24px',fontWeight:'700',color:returnCalc.percentReturn>=0?'#3fb950':'#f85149'}},fmtP(returnCalc.percentReturn)),
-e('div',{style:{fontSize:'11px',color:'#8b949e'}},returnCalc.annualizedReturn.toFixed(1)+'% annualized')
-)
+e('div',null,e('div',{style:{fontSize:'24px',fontWeight:'700'}},fmtC(currentPrice)),divAnalysis&&divAnalysis.currentYield>0&&e('div',{style:{fontSize:'11px',color:'#3fb950'}},divAnalysis.currentYield.toFixed(2)+'% TTM Yield ('+divAnalysis.count+' payments)')),
+returnCalc&&e('div',{style:{textAlign:'right'}},e('div',{style:{fontSize:'24px',fontWeight:'700',color:returnCalc.percentReturn>=0?'#3fb950':'#f85149'}},fmtP(returnCalc.percentReturn)),e('div',{style:{fontSize:'11px',color:'#8b949e'}},returnCalc.annualizedReturn.toFixed(1)+'% annualized'))
 ),
 returnCalc&&e('div',{style:{marginTop:'12px',background:'rgba(0,0,0,0.2)',borderRadius:'8px',padding:'12px'}},
 e('div',{style:{display:'grid',gridTemplateColumns:'1fr auto',gap:'6px',fontSize:'12px'}},
 e('div',null,'Invested:'),e('div',{style:{textAlign:'right'}},fmtC(investmentAmount)),
 e('div',null,'Shares @ '+fmtC(returnCalc.startPrice)+':'),e('div',{style:{textAlign:'right'}},returnCalc.sharesPurchased.toFixed(4)),
-returnCalc.splitCount>0&&e('div',null,'After '+returnCalc.splitCount+' split(s):'),
-returnCalc.splitCount>0&&e('div',{style:{textAlign:'right'}},returnCalc.adjustedShares.toFixed(4)),
+returnCalc.splitCount>0&&e('div',null,'After '+returnCalc.splitCount+' split(s):'),returnCalc.splitCount>0&&e('div',{style:{textAlign:'right'}},returnCalc.adjustedShares.toFixed(4)),
 e('div',null,'Price gain:'),e('div',{style:{textAlign:'right',color:returnCalc.capitalGain>=0?'#3fb950':'#f85149'}},fmtC(returnCalc.capitalGain)),
-returnCalc.dividendCount>0&&e('div',null,'Dividends ('+returnCalc.dividendCount+'):'),
-returnCalc.dividendCount>0&&e('div',{style:{textAlign:'right',color:'#3fb950'}},'+'+fmtC(returnCalc.totalDividendIncome)),
-e('div',{style:{borderTop:'1px solid rgba(48,54,61,0.5)',paddingTop:'6px',fontWeight:'600'}},'Final Value:'),
-e('div',{style:{textAlign:'right',borderTop:'1px solid rgba(48,54,61,0.5)',paddingTop:'6px',fontWeight:'600',color:returnCalc.percentReturn>=0?'#3fb950':'#f85149'}},fmtC(returnCalc.totalReturn))
+returnCalc.dividendCount>0&&e('div',null,'Dividends ('+returnCalc.dividendCount+'):'),returnCalc.dividendCount>0&&e('div',{style:{textAlign:'right',color:'#3fb950'}},'+'+fmtC(returnCalc.totalDividendIncome)),
+e('div',{style:{borderTop:'1px solid rgba(48,54,61,0.5)',paddingTop:'6px',fontWeight:'600'}},'Final Value:'),e('div',{style:{textAlign:'right',borderTop:'1px solid rgba(48,54,61,0.5)',paddingTop:'6px',fontWeight:'600',color:returnCalc.percentReturn>=0?'#3fb950':'#f85149'}},fmtC(returnCalc.totalReturn))
 )
 )
 ),
-e('div',{style:{fontSize:'12px',color:'#8b949e',marginBottom:'10px',display:'flex',justifyContent:'space-between'}},
-e('span',null,e('strong',null,eventCounts.all),' corporate actions',eventCounts.insider>0&&e('span',null,' + ',e('strong',null,eventCounts.insider),' insider trades')),
-e('a',{href:'https://www.investopedia.com/terms/c/corporateaction.asp',target:'_blank',style:{color:'#58a6ff',fontSize:'11px'}},'Learn →')
-),
+e('div',{style:{fontSize:'12px',color:'#8b949e',marginBottom:'10px'}},e('strong',null,eventCounts.all),' corporate actions',eventCounts.insider>0&&e('span',null,' + ',e('strong',null,eventCounts.insider),' insider trades')),
 e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px',overflowX:'auto',paddingBottom:'4px'}},
-[
-{key:'all',label:'All ('+eventCounts.all+')'},
-{key:'dividend',label:'💰 Dividends ('+eventCounts.dividend+')'},
-{key:'split',label:'✂️ Splits ('+eventCounts.split+')'},
-{key:'earnings',label:'📊 Earnings ('+eventCounts.earnings+')'},
-{key:'secFiling',label:'🏛️ SEC ('+eventCounts.secFiling+')'},
-{key:'insider',label:'👤 Insider ('+eventCounts.insider+')'}
-].filter(function(t){return eventCounts[t.key]>0||t.key==='all'}).map(function(tab){
-return e('button',{key:tab.key,className:'tab-btn'+(activeTab===tab.key?' active':''),onClick:function(){setActiveTab(tab.key);setSelectedDividend(null)}},tab.label)
-})),
-activeTab==='insider'&&e('div',{className:'insider-notice'},'👤 Stock transactions by company executives. Shown separately due to volume.'),
-activeTab==='dividend'&&eventCounts.dividend>0&&e('div',{style:{background:'rgba(46,160,67,0.1)',border:'1px solid rgba(46,160,67,0.3)',borderRadius:'8px',padding:'12px',marginBottom:'12px',fontSize:'12px',color:'#3fb950'}},'💰 Click on any dividend row to see full details (record date, payment date, yield, frequency)'),
+[{key:'all',label:'All ('+eventCounts.all+')'},{key:'dividend',label:'💰 Div ('+eventCounts.dividend+')'},{key:'split',label:'✂️ Split ('+eventCounts.split+')'},{key:'earnings',label:'📊 Earn ('+eventCounts.earnings+')'},{key:'secFiling',label:'🏛️ SEC ('+eventCounts.secFiling+')'},{key:'insider',label:'👤 Insider ('+eventCounts.insider+')'}].filter(function(t){return eventCounts[t.key]>0||t.key==='all'}).map(function(tab){return e('button',{key:tab.key,className:'tab-btn'+(activeTab===tab.key?' active':''),onClick:function(){setActiveTab(tab.key);setSelectedDividend(null)}},tab.label)})),
+activeTab==='dividend'&&eventCounts.dividend>0&&e('div',{style:{background:'rgba(46,160,67,0.1)',border:'1px solid rgba(46,160,67,0.3)',borderRadius:'8px',padding:'12px',marginBottom:'12px',fontSize:'12px',color:'#3fb950'}},'💰 Click any dividend row to see full details'),
 e('div',{style:Object.assign({},s.card,{padding:0,overflow:'hidden'})},
-e('div',{className:'event-row',style:{background:'rgba(48,54,61,0.3)',fontWeight:'600',fontSize:'11px',color:'#8b949e'}},
-e('span',null,'TYPE'),e('span',null,'DETAILS'),e('span',null,'AMOUNT / TYPE'),e('span',null,'DATE'),e('span',null,'')
+e('div',{className:'event-row',style:{background:'rgba(48,54,61,0.3)',fontWeight:'600',fontSize:'11px',color:'#8b949e'}},e('span',null,'TYPE'),e('span',null,'DETAILS'),e('span',null,'AMOUNT / TYPE'),e('span',null,'DATE'),e('span',null,'')),
+filteredEvents.length===0?e('div',{style:{padding:'40px',textAlign:'center',color:'#8b949e'}},'No '+activeTab+' events found. Configure API keys for dividend data.'):e('div',{style:{maxHeight:'600px',overflowY:'auto'}},filteredEvents.slice(0,100).map(renderEventRow))
 ),
-filteredEvents.length===0?
-e('div',{style:{padding:'40px',textAlign:'center',color:'#8b949e'}},
-activeTab==='all'?'No corporate actions found. Configure EODHD or FMP API key for dividend data.':'No '+activeTab+' events found'
-):
-e('div',{style:{maxHeight:'600px',overflowY:'auto'}},filteredEvents.slice(0,100).map(renderEventRow))
-),
-filteredEvents.length>100&&e('div',{style:{fontSize:'11px',color:'#8b949e',textAlign:'center',marginTop:'8px'}},'Showing first 100 of '+filteredEvents.length+' events'),
+filteredEvents.length>100&&e('div',{style:{fontSize:'11px',color:'#8b949e',textAlign:'center',marginTop:'8px'}},'Showing first 100 of '+filteredEvents.length),
 e('div',{style:{marginTop:'16px',fontSize:'10px',color:'#6e7681',textAlign:'center'}},'Data: ',eodhdKey&&'EODHD • ',fmpKey&&'FMP • ',finnhubKey&&'Finnhub • ','SEC EDGAR')
 ))}
 ReactDOM.createRoot(document.getElementById('root')).render(e(App));
